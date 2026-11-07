@@ -374,6 +374,45 @@ private struct Steppers: View {
     }
 }
 
+/// صف الدرس: الرقم، العنوان الكبير، العنوان، شنو يغطي من المتن، والحالة
+private struct LessonRow: View {
+    let num: Int
+    let info: LessonInfo?
+    let status: String
+    let done: Bool
+    let current: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: T.s3) {
+                Text(verbatim: "\(num)").font(T.f(14)).monospacedDigit()
+                    .foregroundStyle(current ? T.accent : T.muted)
+                    .frame(width: 40, alignment: .leading)
+                    .padding(.top, 3)
+                VStack(alignment: .leading, spacing: 3) {
+                    if let s = info?.section { Text(s).font(T.f(12)).foregroundStyle(current ? T.accent : T.faint) }
+                    Text(info?.topic ?? "درس \(num)").font(T.f(17)).foregroundStyle(done ? T.faint : T.ink)
+                        .multilineTextAlignment(.leading)
+                    if let c = info?.coverage {
+                        Text(c).font(T.f(13)).foregroundStyle(T.muted).lineLimit(2).multilineTextAlignment(.leading)
+                    } else if let d = info?.details ?? info?.summary {
+                        Text(d).font(T.f(13)).foregroundStyle(T.muted).lineLimit(2).multilineTextAlignment(.leading)
+                    }
+                    Text(status).font(T.f(13)).foregroundStyle(current ? T.accent : T.faint)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Chevron().padding(.top, 6)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(current ? T.rowNext : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// كل درس وحالته، من الأحدث
 private struct LessonList: View {
     @EnvironmentObject var life: LifeStore
@@ -397,14 +436,15 @@ private struct LessonList: View {
     }
 
     var body: some View {
-        let nums = Array(stride(from: top, through: max(course.startNum, top - 40), by: -1))
-        // اللي عليك، وبعده درسين جايين، وبعدها اللي خلص من الأحدث
-        let ordered = [current].filter { nums.contains($0) } + Array(nums.filter { $0 > current }.sorted().prefix(2)) + nums.filter { $0 < current }
+        // كل الدروس من الأحدث: اللي وصل كله، لين قبل اللي عليك بعشرة دروس (أو أول درس عندنا تفصيله)
+        let known = course.info.keys.compactMap { Int($0) }
+        let low = max(1, min(known.min() ?? current, current - 10))
+        let nums = top >= low ? Array(stride(from: top, through: low, by: -1)) : []
         Card {
-            ForEach(Array(ordered.enumerated()), id: \.element) { i, n in
+            ForEach(Array(nums.enumerated()), id: \.element) { i, n in
                 if i > 0 { RowLine() }
-                LinkRow(num: "\(n)", title: course.topic(n) ?? "درس \(n)", sub: status(n),
-                        done: n < current, next: n == current) { onOpen(n) }
+                LessonRow(num: n, info: course.info[String(n)], status: status(n),
+                          done: n < current, current: n == current) { onOpen(n) }
             }
         }
     }
@@ -489,7 +529,7 @@ struct LessonSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: "\(c.title) · درس \(num)").font(T.f(14)).foregroundStyle(T.muted)
+                        Text(verbatim: ([c.title, inf.section].compactMap { $0 } + ["درس \(num)"]).joined(separator: " · ")).font(T.f(14)).foregroundStyle(T.muted)
                         Text(inf.topic ?? "درس \(num)").font(T.f(28, .bold)).foregroundStyle(T.ink)
                         Text(metaLine).font(T.f(14)).foregroundStyle(T.muted)
                     }
@@ -501,6 +541,14 @@ struct LessonSheet: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("سكّر")
+                }
+                if let cov = inf.coverage {
+                    SecLabel(text: "من المتن")
+                    Text(cov).font(T.f(17)).lineSpacing(5).foregroundStyle(T.ink).card()
+                }
+                if let det = inf.details {
+                    SecLabel(text: "شنو فيه")
+                    Text(det).font(T.f(18)).lineSpacing(7).foregroundStyle(T.ink).card()
                 }
                 SecLabel(text: "الملخص")
                 Text(inf.summary ?? "ما في ملخص للحين. ينضاف من المحادثة اللي نرتب فيها الدرس.")

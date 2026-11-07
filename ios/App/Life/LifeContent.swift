@@ -68,6 +68,9 @@ struct CLesson: Decodable {
     var prepStatus: String?
     var missing: Bool?
     var note: String?
+    var details: String?
+    var textFrom: String?
+    var textTo: String?
 }
 
 struct CGymDay: Decodable {
@@ -186,6 +189,10 @@ extension LifeStore {
                 i.report = l.reportStatus
                 i.reportNote = l.reportNote
                 i.missing = l.missing
+                i.details = l.details
+                i.textFrom = l.textFrom
+                i.textTo = l.textTo
+                i.page = l.page
                 info[String(l.num)] = i
             }
             // ملاحظات حسن على دروس ما لها سطر بالجدول

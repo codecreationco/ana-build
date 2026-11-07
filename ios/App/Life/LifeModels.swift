@@ -77,6 +77,19 @@ struct LessonInfo: Codable, Hashable {
     var report: String? = nil       // حالة التقرير من المحادثة
     var reportNote: String? = nil
     var missing: Bool? = nil        // الدرس نفسه مفقود
+    var details: String? = nil      // فقرة: شنو يتكلم الدرس وشنو المسائل
+    var textFrom: String? = nil     // أول عبارة من المتن بالدرس
+    var textTo: String? = nil       // آخر عبارة
+    var page: String? = nil
+
+    /// شنو يغطي من المتن، بسطر وحدة
+    var coverage: String? {
+        var parts: [String] = []
+        if let a = textFrom, let b = textTo { parts.append("من «\(a)» لين «\(b)»") }
+        else if let r = textRef { parts.append(r) }
+        if let p = page, !p.isEmpty { parts.append(p.hasPrefix("ص") ? p : "ص" + p) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
 }
 
 /// قرار انخذ بخطوة من خطوات الشغل
