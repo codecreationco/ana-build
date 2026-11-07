@@ -633,9 +633,9 @@ private struct SleepView: View {
                 }
             }
             RowLine()
-            ValueRow(title: "النوم المقترح الليلة",
-                     sub: "\(LFmt.hours(life.d.sleep.needMin)) ساعات قبل القعدة · تذكير «تجهز للنوم» \(LFmt.clock(life.remindTime(today)))",
-                     value: LFmt.clock(bed))
+            ValueRow(title: "لو نمت الحين",
+                     sub: life.sleepHours == nil ? "باجر ماكو وقت قعدة" : "تقعد " + LFmt.clock(life.wakeFor(LifeStore.nowMinutes() < 720 ? today : life.tomorrow)),
+                     value: life.sleepHours.map { "بعد " + LFmt.dur($0) } ?? "—", valueDim: life.sleepHours == nil)
         }
         SecHead(title: "اليوم", trailing: "اضغط أي وقت تعدله")
         Card {
@@ -670,8 +670,8 @@ private struct SleepView: View {
     }
 
     private func napSub(_ nap: NapLog?, _ bed: Int) -> String {
-        guard let n = nap else { return "العصر · إذا قيّلت يتأخر النوم المقترح" }
-        return "العصر · صار النوم المقترح \(LFmt.clock(bed)) بدال \(LFmt.clock(bed - n.min))"
+        guard nap != nil else { return "العصر" }
+        return "العصر"
     }
 }
 

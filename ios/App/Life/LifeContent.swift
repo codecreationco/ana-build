@@ -12,8 +12,9 @@ struct ContentDoc: Decodable {
     var weekly: [CWeekly] = []
     var appointments: [CAppt] = []
     var books: [CBook] = []
+    var routine: [CRoutine] = []
 
-    enum CodingKeys: String, CodingKey { case courses, lessons, gymDays, workSteps, workDecisions, weekly, appointments, books }
+    enum CodingKeys: String, CodingKey { case courses, lessons, gymDays, workSteps, workDecisions, weekly, appointments, books, routine }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -25,6 +26,7 @@ struct ContentDoc: Decodable {
         weekly = (try? c.decode([CWeekly].self, forKey: .weekly)) ?? []
         appointments = (try? c.decode([CAppt].self, forKey: .appointments)) ?? []
         books = (try? c.decode([CBook].self, forKey: .books)) ?? []
+        routine = (try? c.decode([CRoutine].self, forKey: .routine)) ?? []
     }
 }
 
@@ -118,6 +120,15 @@ struct CWeekly: Decodable {
     var slot: String?
     var detail: String?
     var kind: String?
+}
+
+struct CRoutine: Decodable {
+    var id: String
+    var title: String
+    var sub: String?
+    var days: [Int]?
+    var sortTime: String
+    var timeText: String?
 }
 
 struct CBook: Decodable {
@@ -247,6 +258,11 @@ extension LifeStore {
             book.total = b.totalPages ?? 0
             return book
         }
+
+        // المشاوير الثابتة من الجدول، واللي لمرة وحدة تبقى من التطبيق
+        d.chores = c.routine.map { (r: CRoutine) -> Chore in
+            Chore(id: r.id, title: r.title, sub: r.sub, time: r.sortTime, days: r.days ?? [], timeText: r.timeText)
+        } + d.chores.filter { $0.day != nil }
 
         // المواعيد
         d.special = c.appointments.map {

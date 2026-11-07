@@ -372,7 +372,9 @@ struct PrayerView: View {
                 if p.pray {
                     let isCur = cur?.id == p.id && !life.prayed(p.id, life.today)
                     let isNext = !isCur && next?.0.id == p.id && cur == nil
-                    ItemRow(time: LFmt.clock(p.min), title: p.name, tag: isCur ? "الحين" : (isNext ? "الجاي" : nil),
+                    ItemRow(time: LFmt.clock(p.min), title: p.name,
+                            sub: [p.note, p.end.map { "القضاء " + LFmt.clock($0) }].compactMap { $0 }.joined(separator: " · "),
+                            tag: isCur ? "الحين" : (isNext ? "الجاي" : nil),
                             done: life.prayed(p.id, life.today), next: isCur || isNext, checkLabel: "صليت") {
                         let was = life.prayed(p.id, life.today)
                         life.act((was ? "رجعت: " : "تم: صلاة ") + p.name) { life.togglePrayer(p.id, life.today) }
@@ -383,7 +385,7 @@ struct PrayerView: View {
                             .frame(width: 58, alignment: .leading)
                         Text(p.name).font(T.f(18)).foregroundStyle(T.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("شروق").font(T.f(13)).foregroundStyle(T.muted)
+                        Text(p.id == "sunrise" ? "قضاء الفجر" : "قضاء المغرب").font(T.f(13)).foregroundStyle(T.muted)
                     }
                     .padding(.horizontal, 18).padding(.vertical, 10)
                     .frame(minHeight: 52)
@@ -401,6 +403,6 @@ struct PrayerView: View {
                 Switch(on: life.d.prayerAsk, label: "صليت تحت اسمك") { life.setPrayerAsk(!life.d.prayerAsk) }
             }
         }
-        Foot(text: "الأوقات هنا تجريبية، لين ترسل جدول الصلوات")
+        Foot(text: "مدينة الكويت، على طريقة تقويم الصايغ (الفرق دقيقة بالأكثر). إذا ما سجلت إنك صليت، يجيك تنبيه قبل القضاء بـ 20 دقيقة")
     }
 }

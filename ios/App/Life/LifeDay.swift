@@ -67,18 +67,18 @@ extension LifeStore {
     var todayItems: [TodayItem] {
         var out: [TodayItem] = []
 
-        out.append(TodayItem(id: "leave", time: 420, timeText: "قبل الطلعة", title: "قبل لا أطلع",
+        out.append(TodayItem(id: "leave", time: 400, timeText: "قبل الطلعة", title: "قبل لا أطلع",
                              sub: leaveSub, done: leaveDone, kind: .leave))
 
         for c in choresOn(today) {
             let t = LFmt.minutesOf(c.time)
-            out.append(TodayItem(id: "c-" + c.id, time: t, timeText: DateKit.timeLabel(c.time), title: c.title,
+            out.append(TodayItem(id: "c-" + c.id, time: t, timeText: c.timeText ?? DateKit.timeLabel(c.time), title: c.title,
                                  sub: c.sub ?? (c.routine ? nil : "مو روتيني"), done: isChoreDone(c.id, today),
                                  routine: c.routine, kind: .chore(c.id)))
         }
 
         if let w = workout(on: today) {
-            out.append(TodayItem(id: "gym", time: 480, timeText: "8:00 ص", title: "النادي · \(w.kind)",
+            out.append(TodayItem(id: "gym", time: 450, timeText: "بعد الروضة", title: "النادي · \(w.kind)",
                                  sub: w.pool ? "مشي، حديد، حوض" : "مشي وحديد", done: gymDoneToday, kind: .gym))
         }
 
@@ -318,17 +318,17 @@ extension LifeStore {
 
     // MARK: - الصلاة
 
-    /// أوقات تجريبية لين يوصل جدول الصلوات
-    static let prayerTable: [Prayer] = [
-        Prayer(id: "fajr", name: "الفجر", time: "04:32"),
-        Prayer(id: "sunrise", name: "الشروق", time: "05:52", pray: false),
-        Prayer(id: "dhuhr", name: "الظهر", time: "11:20"),
-        Prayer(id: "asr", name: "العصر", time: "14:28"),
-        Prayer(id: "maghrib", name: "المغرب", time: "16:49"),
-        Prayer(id: "isha", name: "العشاء", time: "18:06"),
-    ]
-
-    func prayers(_ day: String) -> [Prayer] { Self.prayerTable }
+    /// الفجر والظهر والمغرب (على طريقة تقويم الصايغ للكويت)، والشروق ومنتصف الليل للعلم
+    func prayers(_ day: String) -> [Prayer] {
+        guard let t = PrayerCalc.day(day) else { return [] }
+        return [
+            Prayer(id: "fajr", name: "الفجر", min: t.subh, end: t.sunrise, note: "الأذان " + LFmt.clock(t.fajrAdhan)),
+            Prayer(id: "sunrise", name: "الشروق", min: t.sunrise, pray: false),
+            Prayer(id: "dhuhr", name: "الظهر", min: t.dhuhr, end: t.sunset, note: "الزوال " + LFmt.clock(t.zawal)),
+            Prayer(id: "maghrib", name: "المغرب", min: t.maghrib, end: t.midnight, note: "الغروب " + LFmt.clock(t.sunset)),
+            Prayer(id: "midnight", name: "منتصف الليل", min: t.midnight, pray: false),
+        ]
+    }
 
     func prayed(_ id: String, _ day: String) -> Bool { d.prayerDone[day]?.contains(id) ?? false }
 
@@ -337,17 +337,13 @@ extension LifeStore {
         if let i = l.firstIndex(of: id) { l.remove(at: i) } else { l.append(id) }
         d.prayerDone[day] = l.isEmpty ? nil : l
         save()
+        LifeNotifier.schedule(self)
     }
 
     /// الصلاة اللي دخل وقتها وما جت اللي بعدها
     var currentPrayer: Prayer? {
         let now = Self.nowMinutes()
-        let list = prayers(today)
-        for (i, p) in list.enumerated() where p.pray {
-            let end = i + 1 < list.count ? list[i + 1].min : 1440
-            if now >= p.min && now < end { return p }
-        }
-        return nil
+        return prayers(today).first { $0.pray && now >= $0.min && now < ($0.end ?? 1440) }
     }
 
     /// الصلاة الجاية: (الصلاة، كم دقيقة باقي)
@@ -380,13 +376,8 @@ extension LifeStore {
         if !woke && now >= 180 && now < wakeEnd { return .wake }
         if let c = lessonNow { return .lesson(c) }
         if d.prayerAsk, let p = currentPrayer, !prayed(p.id, today) { return .prayer(p) }
-        if let nap = napToday {
-            let at = LFmt.minutesOf(nap.at) ?? 0
-            if now >= at + 60 { return .bed }
-            return .none
-        }
-        if woke && now >= 720 && now < 1080 { return .nap }
-        if now >= 1080 || now < 180 { return .bed }
+        if woke && napToday == nil && now >= 720 && now < 1080 { return .nap }
+        if (now >= 1080 || now < 180) && sleepHours != nil { return .bed }
         return .none
     }
 
@@ -406,6 +397,17 @@ extension LifeStore {
     func course(of item: TodayItem) -> Course? {
         guard case .lesson(let id) = item.kind else { return nil }
         return todayTasks.first { $0.id == id }?.course
+    }
+
+    /// لو نمت الحين، تقعد بعد كم دقيقة (الأحد لين الخميس 6:30، والجمعة والسبت بس إذا شغّلت المنبه)
+    var sleepHours: Int? {
+        let now = Self.nowMinutes()
+        // بعد نص الليل القعدة نفس اليوم، وقبله باجر
+        let wakeDay = now < 720 ? today : tomorrow
+        guard alarmOn(wakeDay) else { return nil }
+        var m = wakeFor(wakeDay) - now
+        if m < 0 { m += 1440 }
+        return m
     }
 
     // MARK: - الأكل

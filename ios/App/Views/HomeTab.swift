@@ -222,10 +222,9 @@ struct StatusLineView: View {
                     }
                 }
             case .bed:
-                line("نومك الليلة") {
-                    timeButton(LFmt.clock(life.bedtime(life.today)), "غيّر وقت النوم الليلة") { sheet = .bed }
-                    Text(verbatim: "تذكير \(LFmt.clock(life.remindTime(life.today)))")
-                        .font(T.f(14)).foregroundStyle(T.muted)
+                line("لو نمت الحين") {
+                    Text(verbatim: "تقعد بعد " + LFmt.dur(life.sleepHours ?? 0))
+                        .font(T.f(16, .bold)).monospacedDigit().foregroundStyle(T.ink)
                         .padding(.trailing, T.s2)
                 }
             case .prayer(let p):

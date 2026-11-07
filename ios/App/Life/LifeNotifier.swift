@@ -1,7 +1,7 @@
 import Foundation
 import UserNotifications
 
-/// التنبيهات تنضبط على التلفون نفسه: القعدة، الصلاة، الدروس، «تجهز للنوم»، وقبل لا تطلع.
+/// التنبيهات تنضبط على التلفون نفسه: القعدة، الصلاة (وقبل القضاء)، الدروس، وقبل لا تطلع.
 /// (عداد الراحة بالنادي ينضبط بروحه ونخليه.)
 enum LifeNotifier {
     static func requestAuth() async {
@@ -39,6 +39,15 @@ enum LifeNotifier {
                     add(day, p.time, "a-pr-\(p.id)-\(day)", "صلاة \(p.name)", "دخل وقت \(p.name)")
                 }
             }
+            // ما سجلت إنك صليت: تنبيه قبل القضاء بـ 20 دقيقة
+            if i < 3 {
+                for p in store.prayers(day) where p.pray && !store.prayed(p.id, day) {
+                    guard let end = p.end else { continue }
+                    let name = p.id == "fajr" ? "الشروق" : (p.id == "dhuhr" ? "الغروب" : "منتصف الليل")
+                    add(day, LFmt.hhmm(end - 20), "q-\(p.id)-\(day)", "ما صليت \(p.name)؟",
+                        "باقي 20 دقيقة على \(name) (\(LFmt.clock(end)))")
+                }
+            }
 
             // الدروس الحضورية: قبلها بنص ساعة، وقبلها بدقيقة (والرابط ينفتح من الإشعار)
             for c0 in store.d.courses where c0.mode != .recording && store.held(c0, day) {
@@ -54,15 +63,8 @@ enum LifeNotifier {
 
             // قبل لا تطلع
             let gym = store.workout(on: day) != nil
-            add(day, "07:00", "l-am-\(day)", "قبل لا تطلع",
+            add(day, "06:45", "l-am-\(day)", "قبل لا تطلع",
                 gym ? "القهوة مع الكرياتين، والمطارة مع الإلكترولايت. اليوم نادي" : "القهوة مع الكرياتين، والمطارة")
-        }
-
-        // تجهز للنوم: قبل النوم المقترح بنص ساعة (الليلة وباجر)
-        for i in 0..<2 {
-            let day = DateKit.add(i, to: store.today)
-            let bed = store.bedtime(day)
-            add(day, LFmt.hhmm(store.remindTime(day)), "b-\(day)", "تجهز للنوم", "النوم المقترح \(LFmt.clock(bed))")
         }
 
         let list = reqs.sorted { $0.0 < $1.0 }.prefix(60)

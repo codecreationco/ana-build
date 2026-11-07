@@ -247,6 +247,7 @@ struct Chore: Codable, Identifiable, Hashable {
     var days: [Int] = []           // 1 = الأحد … 7 = السبت
     var day: String? = nil         // لمرة وحدة
     var routine = true
+    var timeText: String? = nil    // اللي يطلع بدال الساعة: «7:00 – 7:30»، «قبل الروضة»
 }
 
 // MARK: - القراءة
@@ -263,7 +264,7 @@ struct Book: Codable, Identifiable, Hashable {
 // MARK: - خطة النوم
 
 struct SleepPlan: Codable, Hashable {
-    var wake = "05:00"             // القعدة من الأحد لين الخميس
+    var wake = "06:30"             // القعدة من الأحد لين الخميس
     var alarm = true
     var needMin = 540              // النوم المقترح: 9 ساعات قبل القعدة
     var remindMin = 30             // «تجهز للنوم» قبلها بنص ساعة
@@ -291,9 +292,11 @@ struct FoodEntry: Codable, Identifiable, Hashable {
 struct Prayer: Identifiable, Hashable {
     let id: String
     let name: String
-    let time: String
-    var pray = true                // الشروق ما ينصلى
-    var min: Int { LFmt.minutesOf(time) ?? 0 }
+    let min: Int                   // وقتها (دقايق من نص الليل)
+    var pray = true                // الشروق ومنتصف الليل ما ينصلون
+    var end: Int? = nil            // وقت القضاء: الشروق، الغروب، منتصف الليل
+    var note: String? = nil        // «الأذان 4:44»
+    var time: String { LFmt.hhmm(min) }
 }
 
 // MARK: - الأخبار
