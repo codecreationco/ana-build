@@ -64,9 +64,12 @@ enum Refresher {
 
     static func run() async {
         schedule()
-        guard let f = try? await API.feed(from: Store.rangeFrom(), to: Store.rangeTo()) else { return }
-        FeedCache.save(f)
-        await Notifier.schedule(feed: f)
-        WidgetCenter.shared.reloadAllTimelines()
+        guard let life = await LifeStore.current else { return }
+        await life.pull()
+        await MainActor.run {
+            life.advance()
+            LifeNotifier.schedule(life)
+            life.writeWidget()
+        }
     }
 }

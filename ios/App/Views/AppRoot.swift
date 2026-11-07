@@ -20,13 +20,19 @@ struct AppRoot: View {
             try? await Task.sleep(nanoseconds: 1_100_000_000)
             withAnimation(.easeOut(duration: 0.35)) { splash = false }
         }
-        .task { await life.pull() }
+        .task {
+            life.writeWidget()
+            await life.pull()
+            life.writeWidget()
+        }
         .onChange(of: phase) { _, p in
             if p == .active {
                 life.advance()
                 LifeNotifier.schedule(life)
-                Task { await life.pull() }
+                life.writeWidget()
+                Task { await life.pull(); life.writeWidget() }
             }
+            if p == .background { life.writeWidget() }
         }
     }
 }

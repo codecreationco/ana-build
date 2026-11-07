@@ -25,6 +25,9 @@ final class LifeStore: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: "sync.base") }
     }
 
+    /// النسخة الشغالة (للتحديث بالخلفية)
+    static weak var current: LifeStore?
+
     init() {
         if Snap.on {
             d = LifeSample.make()
@@ -35,6 +38,7 @@ final class LifeStore: ObservableObject {
             d = .empty
         }
         advance()
+        Self.current = self
     }
 
     func save() {
@@ -52,6 +56,7 @@ final class LifeStore: ObservableObject {
     private func writeLocal() {
         guard !Snap.on, let data = try? JSONEncoder().encode(d) else { return }
         try? data.write(to: Self.url, options: .atomic)
+        writeWidget()
     }
 
     // MARK: - المزامنة
