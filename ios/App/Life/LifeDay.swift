@@ -32,7 +32,7 @@ extension LifeStore {
         case (true, true): return "القهوة والمطارة تم"
         case (true, false): return "القهوة تم · المطارة باقي"
         case (false, true): return "المطارة تم · القهوة باقي"
-        default: return workout(on: today) != nil ? "القهوة، والمطارة فيها الإلكترولايت" : "القهوة والمطارة"
+        default: return workout(on: today) != nil ? "القهوة مع الكرياتين، والمطارة مع الإلكترولايت" : "القهوة مع الكرياتين، والمطارة"
         }
     }
 

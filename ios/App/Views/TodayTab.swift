@@ -140,6 +140,12 @@ private struct OtherDay: View {
 
     private func build() -> [Row] {
         var out: [Row] = []
+        // قبل لا أطلع: القهوة مع الكرياتين، والمطارة (وفيها الإلكترولايت أيام النادي)
+        let gym = life.workout(on: day) != nil
+        let h = life.d.health[day]
+        out.append(Row(id: "leave", time: 400, when: "قبل الطلعة", title: "قبل لا أطلع",
+                       sub: gym ? "القهوة مع الكرياتين، والمطارة مع الإلكترولايت" : "القهوة مع الكرياتين، والمطارة",
+                       done: day < life.today && (h?.creatine ?? false) && (h?.bottle ?? false)))
         // الجدول: الدروس والنادي والمواعيد والطلعات
         for e in life.events(on: day) {
             // موعد بدون وقت: ما نكتب «اليوم» جنبه
