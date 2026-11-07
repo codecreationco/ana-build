@@ -342,7 +342,7 @@ private struct SetRow: View {
             Check(on: done, label: "خلصت الجولة \(i + 1)", hit: 40) {
                 let was = done
                 life.act(was ? "رجعت: \(ex.name) \(i + 1)" : "تم: \(ex.name) · الجولة \(i + 1)") { life.toggleSet(day, ex, i) }
-                if !was && day == life.today {
+                if !was {
                     RestTimer.shared.start(ex.restSec, next: nextLabel())
                 }
             }
