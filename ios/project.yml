@@ -1,0 +1,92 @@
+name: Ana
+options:
+  bundleIdPrefix: com.ana
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: ar
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Manual
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  Ana:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+      - path: Resources/Fonts
+        buildPhase: resources
+        excludes: ["*.txt"]
+      - Resources/Assets.xcassets
+    dependencies:
+      - target: AnaWidget
+        embed: true
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: أنا
+        CFBundleDevelopmentRegion: ar
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBG
+          UIImageName: LaunchLogo
+          UIImageRespectsSafeAreaInsets: true
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIAppFonts:
+          - HasanNassim-Regular.ttf
+          - HasanNassim-Bold.ttf
+          - HasanNum-Regular.ttf
+          - HasanNum-Bold.ttf
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [com.ana.refresh]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.ana.app
+            CFBundleURLSchemes: [ana]
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ana.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+
+  AnaWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widget
+      - Shared
+      - path: Resources/Fonts
+        buildPhase: resources
+        excludes: ["*.txt"]
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: أنا
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIAppFonts:
+          - HasanNassim-Regular.ttf
+          - HasanNassim-Bold.ttf
+          - HasanNum-Regular.ttf
+          - HasanNum-Bold.ttf
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ana.app.widget
+
+schemes:
+  Ana:
+    build:
+      targets:
+        Ana: all
+        AnaWidget: all

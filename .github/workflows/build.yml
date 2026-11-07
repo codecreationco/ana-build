@@ -1,0 +1,164 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+    paths: ["ios/**", ".github/workflows/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: ios
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # مفاتيح قاعدة البيانات تجي من GitHub Secrets. إذا مو موجودة، التطبيق يشتغل على بيانات تجريبية.
+      - name: Write secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+        run: |
+          cat > Shared/Secrets.swift <<EOF
+          enum Secrets {
+              static let supabaseURL = "${SUPABASE_URL}"
+              static let supabaseKey = "${SUPABASE_KEY}"
+              static let appKey = "${APP_KEY}"
+          }
+          EOF
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Ana.xcodeproj \
+            -scheme Ana \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="0.2.${{ github.run_number }}" CURRENT_PROJECT_VERSION="$((100 + ${{ github.run_number }}))" \
+            build 2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          # نتأكد إن البناء نجح فعلاً: الملف التنفيذي والويدجت موجودين
+          grep -q "BUILD SUCCEEDED" build.log
+          test -f build/Build/Products/Release-iphoneos/Ana.app/Ana
+          test -f build/Build/Products/Release-iphoneos/Ana.app/PlugIns/AnaWidget.appex/AnaWidget
+
+      - name: Show errors
+        if: failure()
+        run: grep -n -B2 -A6 "error:" build.log | head -300 || true
+
+      - name: Package IPA
+        run: |
+          APP=build/Build/Products/Release-iphoneos/Ana.app
+          ls "$APP/PlugIns"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry "Ana-0.2.${{ github.run_number }}.ipa" Payload
+          ls -lh Ana-*.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ana-ipa
+          path: ios/Ana-*.ipa
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # رقم النسخة: 0.1.<رقم البناء>، ويطلع فوق جنب «أنا» داخل التطبيق
+          VER="0.2.${{ github.run_number }}"
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" "Ana-$VER.ipa" --title "حسن · $VER" --notes "commit ${{ github.sha }}" --latest
+
+  # صور كل تاب على آيفون وهمي، عشان Claude يشوف الشكل الحقيقي قبل ما يسلّم
+  screens:
+    runs-on: macos-14
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          brew install xcodegen
+
+      - name: Build for simulator
+        run: |
+          printf 'enum Secrets {\n static let supabaseURL = ""\n static let supabaseKey = ""\n static let appKey = ""\n}\n' > Shared/Secrets.swift
+          xcodegen generate
+          set -o pipefail
+          xcodebuild -project Ana.xcodeproj -scheme Ana -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath simbuild CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -5
+          test -d simbuild/Build/Products/Debug-iphonesimulator/Ana.app
+
+      - name: Take screenshots
+        timeout-minutes: 12
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)['devices']
+          c=[x for k,v in d.items() if 'iOS' in k for x in v if x['name']=='iPhone 16']
+          c=c or [x for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]
+          print(c[0]['udid'])")
+          echo "device $UDID"
+          xcrun simctl boot "$UDID" || true
+          echo "booting…"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "booted"
+          xcrun simctl status_bar "$UDID" override --time "6:40" --batteryState charged --batteryLevel 100 --cellularBars 4 || true
+          xcrun simctl install "$UDID" simbuild/Build/Products/Debug-iphonesimulator/Ana.app
+          mkdir -p shots
+          xcrun simctl launch "$UDID" com.ana.app -snapAuto 1
+          DATA=$(xcrun simctl get_app_container "$UDID" com.ana.app data)
+          for t in $(seq 1 150); do [ -f "$DATA/Documents/snapcount.txt" ] && break; sleep 0.2; done
+          N=$(cat "$DATA/Documents/snapcount.txt")
+          cp "$DATA/Documents/snapnames.txt" shots/names.txt
+          echo "steps $N"
+          for i in $(seq 0 $((N-1))); do
+            for t in $(seq 1 150); do [ "$(cat "$DATA/Documents/snap.txt" 2>/dev/null)" = "$i" ] && break; sleep 0.2; done
+            sleep 1.8
+            xcrun simctl io "$UDID" screenshot "shots/$(printf %02d $i).png" >/dev/null 2>&1
+            touch "$DATA/Documents/done-$i.txt"
+            echo "shot $i"
+          done
+          # أصغر عشان المراجعة
+          for f in shots/*.png; do sips -Z 1300 "$f" >/dev/null; done
+          ls shots | wc -l
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screens
+          path: ios/shots
+
+      # الصور تنحط بإصدار صغير، عشان Claude يقدر ينزلها ويشوفها
+      - name: Publish screenshots
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls shots/*.png >/dev/null 2>&1 || exit 0
+          (cd shots && zip -q ../shots.zip *.png names.txt)
+          gh release create "screens-${{ github.run_number }}" shots.zip --title "صور ${{ github.run_number }}" --notes "screens" --prerelease --latest=false

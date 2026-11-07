@@ -1,0 +1,13 @@
+# ملفات تنولّد وقت البناء
+ios/Ana.xcodeproj/
+ios/build/
+ios/Payload/
+ios/App/Info.plist
+ios/Widget/Info.plist
+*.ipa
+
+# مفاتيح قاعدة البيانات: تنكتب وقت البناء من GitHub Secrets، ما تنحفظ هني
+ios/Shared/Secrets.swift
+
+.DS_Store
+Thumbs.db
