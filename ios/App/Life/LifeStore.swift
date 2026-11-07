@@ -131,6 +131,7 @@ final class LifeStore: ObservableObject {
         guard let c = try? await LifeSync.content() else { return }
         let before = d
         applyContent(c)
+        advance()
         if d != before {
             writeLocal()
             dirty = true
@@ -197,7 +198,7 @@ final class LifeStore: ObservableObject {
         guard let i = d.courses.firstIndex(where: { $0.id == id }) else { return }
         var c = d.courses[i]
         if stage == 0 {
-            let cap = c.mode == .teach ? c.stageB + 3 : c.released
+            let cap = c.mode == .teach ? c.stageB + 3 : max(c.released, lessonNumber(c, on: today) ?? 0)
             let v = min(max(c.stageA + delta, c.mode == .teach ? c.stageB : 0), cap)
             guard v != c.stageA else { return }
             if delta > 0 { d.lessonLogs.append(LessonLog(day: today, course: id, stage: 0, num: v)) }
@@ -465,7 +466,7 @@ final class LifeStore: ObservableObject {
         let wd = DateKit.weekday(day)
         var out: [DayEvent] = []
 
-        for c in d.courses where c.mode != .recording && c.days.contains(wd) {
+        for c in d.courses where c.mode != .recording && (c.days.contains(wd) || isExtra(c, day)) {
             let t = LFmt.minutesOf(c.time) ?? 600
             let title = c.mode == .teach ? "تدريس \(c.title)" : "درس \(c.shortName)"
             var detail: String? = c.mode == .online ? "أونلاين" : nil
@@ -506,10 +507,17 @@ final class LifeStore: ObservableObject {
     }
 
     /// «اليوم ماكو درس»: الدرس انلغى هاليوم
-    func isOff(_ c: Course, _ day: String) -> Bool { d.noLesson[day]?.contains(c.id) ?? false }
+    func isOff(_ c: Course, _ day: String) -> Bool {
+        (d.noLesson[day]?.contains(c.id) ?? false) || (d.planOff[day]?.contains(c.id) ?? false)
+    }
 
-    /// في درس فعلاً بهاليوم (يومه، وما انلغى)
-    func held(_ c: Course, _ day: String) -> Bool { c.days.contains(DateKit.weekday(day)) && !isOff(c, day) }
+    /// درس زيادة بيوم غير يومه (مثل لما ينتقل درس الأحد للاثنين)
+    func isExtra(_ c: Course, _ day: String) -> Bool { d.planExtra[day]?.contains(c.id) ?? false }
+
+    /// في درس فعلاً بهاليوم (يومه أو درس زيادة، وما انلغى)
+    func held(_ c: Course, _ day: String) -> Bool {
+        (c.days.contains(DateKit.weekday(day)) || isExtra(c, day)) && !isOff(c, day)
+    }
 
     func toggleNoLesson(_ c: Course, _ day: String) {
         var l = d.noLesson[day] ?? []

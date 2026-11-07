@@ -384,7 +384,9 @@ struct LifeData: Codable, Equatable {
     var prayerAsk = true
     var food: [String: [FoodEntry]] = [:]
     var workDecisions: [WorkDecision] = []
-    var noLesson: [String: [String]] = [:]   // اليوم ← المواد اللي «ماكو درس» فيها
+    var noLesson: [String: [String]] = [:]   // اليوم ← المواد اللي «ماكو درس» فيها (حسن من التطبيق)
+    var planOff: [String: [String]] = [:]    // من جدول lesson_changes: ماكو درس
+    var planExtra: [String: [String]] = [:]  // من جدول lesson_changes: درس بيوم غير يومه
 }
 
 extension LifeData {
@@ -428,6 +430,8 @@ extension LifeData {
         food = try c.decodeIfPresent([String: [FoodEntry]].self, forKey: .food) ?? [:]
         workDecisions = try c.decodeIfPresent([WorkDecision].self, forKey: .workDecisions) ?? []
         noLesson = try c.decodeIfPresent([String: [String]].self, forKey: .noLesson) ?? [:]
+        planOff = try c.decodeIfPresent([String: [String]].self, forKey: .planOff) ?? [:]
+        planExtra = try c.decodeIfPresent([String: [String]].self, forKey: .planExtra) ?? [:]
     }
 }
 

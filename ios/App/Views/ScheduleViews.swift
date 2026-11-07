@@ -307,7 +307,7 @@ struct GridBoard: View {
             guard let c = life.course("mantiq") else { return GridCell(text: "", state: .none) }
             let taught = life.logs(on: day, course: c.id, stage: 1)
             if !taught.isEmpty { return GridCell(text: nums(taught), state: .done) }
-            guard c.days.contains(wd) else { return GridCell(text: "", state: .none) }
+            guard life.held(c, day) else { return GridCell(text: life.isOff(c, day) && c.days.contains(wd) ? "—" : "", state: .none) }
             if day == life.today && passed(day, time: c.time) { return GridCell(text: "؟", state: .missed) }
             return GridCell(text: life.teachNumber(c, on: day).map(String.init) ?? "", state: .planned)
         case "متاجر":
@@ -318,7 +318,7 @@ struct GridBoard: View {
             guard day >= s else { return GridCell(text: "", state: .none) }
             return GridCell(text: "\(c.stageA + 1 + DateKit.diff(s, day))", state: .planned)
         case "فرائد":
-            guard let c = life.course("faraid"), c.days.contains(wd) else { return GridCell(text: "", state: .none) }
+            guard let c = life.course("faraid"), life.held(c, day) else { return GridCell(text: "", state: .none) }
             let v = life.logs(on: day, course: c.id, stage: 0)
             if !v.isEmpty { return GridCell(text: nums(v), state: .done) }
             let n = life.lessonNumber(c, on: day).map(String.init) ?? ""

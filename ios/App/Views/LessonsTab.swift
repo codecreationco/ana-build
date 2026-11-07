@@ -128,7 +128,7 @@ struct CourseBlock: View {
         case .recording:
             return c.backlog > 0 ? "عليك: درس \(c.stageA + 1)" + topic(c.stageA + 1) : "ملحّق، ما عليك شي"
         case .online:
-            if c.days.contains(DateKit.weekday(life.today)), let n = life.lessonNumber(c, on: life.today), n > c.stageA {
+            if life.held(c, life.today), let n = life.lessonNumber(c, on: life.today), n > c.stageA {
                 return "اليوم: حضور درس \(n)"
             }
             let day = nextLessonDay(c)
@@ -140,7 +140,7 @@ struct CourseBlock: View {
     private func nextLessonDay(_ c: Course) -> String {
         for i in 1..<14 {
             let d = DateKit.add(i, to: life.today)
-            if c.days.contains(DateKit.weekday(d)) { return d }
+            if life.held(c, d) { return d }
         }
         return DateKit.add(1, to: life.today)
     }
