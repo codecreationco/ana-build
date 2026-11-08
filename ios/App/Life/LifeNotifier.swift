@@ -70,7 +70,7 @@ enum LifeNotifier {
         let list = reqs.sorted { $0.0 < $1.0 }.prefix(60)
         center.getPendingNotificationRequests { pending in
             // نشيل كل شي إلا عداد الراحة، ونرجع نضبط
-            let old = pending.map(\.identifier).filter { $0 != "rest" }
+            let old = pending.map(\.identifier).filter { $0 != "rest" && !$0.hasPrefix("walk-") }
             center.removePendingNotificationRequests(withIdentifiers: old)
             for (fire, id, content) in list {
                 let trig = UNTimeIntervalNotificationTrigger(timeInterval: max(1, fire.timeIntervalSinceNow), repeats: false)

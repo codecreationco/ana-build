@@ -102,12 +102,7 @@ private struct GymView: View {
                     Text(c).font(T.f(14)).foregroundStyle(T.muted)
                         .padding(.horizontal, 2).padding(.vertical, T.s3)
                 }
-                Card {
-                    ItemRow(title: "المشي", sub: w.walk.map { "\($0.min) د على \(LFmt.weight($0.speed))" }.joined(separator: " · "),
-                            done: g.walk) {
-                        life.act(g.walk ? "رجعت: المشي" : "تم: المشي") { life.toggleWalk(day) }
-                    }
-                }
+                if !w.walk.isEmpty { WalkCard(day: day, w: w) }
                 Card {
                     ForEach(Array(w.exercises.enumerated()), id: \.element.id) { i, ex in
                         if i > 0 { RowLine() }
@@ -195,6 +190,150 @@ private struct GymView: View {
                 .accessibilityLabel("كم دقيقة سبحت")
             }
         }
+    }
+}
+
+/// المشي: عداد لكل مقطع، والنبض بالبداية وعند كل تحويل سرعة، وإشعار وقت التحويل
+private struct WalkCard: View {
+    @EnvironmentObject var life: LifeStore
+    let day: String
+    let w: WorkoutDay
+
+    private var segs: [WalkSeg] { w.walk }
+    /// بداية المقطع بالثواني من أول المشي
+    private func startOf(_ i: Int) -> Int { segs.prefix(i).reduce(0) { $0 + $1.min } * 60 }
+    private var total: Int { startOf(segs.count) }
+    private func index(at e: Int) -> Int { (0..<segs.count).last { startOf($0) <= e } ?? 0 }
+    private func speed(_ v: Double) -> String { "\u{2066}" + LFmt.weight(v) + "\u{2069}" }
+
+    var body: some View {
+        let g = life.gymLog(day)
+        Card {
+            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                let el = g.walkStart.map { max(0, Int(ctx.date.timeIntervalSince1970 - $0)) }
+                let over = (el ?? 0) >= total
+                let running = el != nil && !over && !g.walk
+                let cur = el.map { index(at: $0) }
+                VStack(spacing: 0) {
+                    if running, let e = el, let i = cur {
+                        live(e, i)
+                    } else {
+                        idle(g, started: el != nil)
+                    }
+                    ForEach(segs.indices, id: \.self) { i in
+                        RowLine()
+                        segRow(i, g, active: running && cur == i)
+                    }
+                }
+                .onChange(of: over) { _, o in
+                    // خلص الوقت والتطبيق مفتوح: نسجل المشي
+                    if o, !g.walk, let e = el, e < total + 5 {
+                        life.act("تم: المشي") { life.updateGym(day) { $0.walk = true } }
+                    }
+                }
+            }
+        }
+    }
+
+    private func idle(_ g: GymLog, started: Bool) -> some View {
+        HStack(spacing: T.s3) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("المشي").font(T.f(17)).foregroundStyle(g.walk ? T.faint : T.ink)
+                Text(verbatim: g.walk ? "خلص · \(total / 60) د" : "\(total / 60) د · \(segs.count) مقاطع")
+                    .font(T.f(14)).foregroundStyle(T.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !g.walk {
+                SmallButton(text: started ? "من جديد" : "ابدأ") { start() }
+            }
+            Check(on: g.walk, label: "خلصت المشي") {
+                life.act(g.walk ? "رجعت: المشي" : "تم: المشي") { life.toggleWalk(day) }
+                if !g.walk { cancel() }
+            }
+        }
+        .padding(.leading, 18).padding(.trailing, 8)
+        .padding(.vertical, 10)
+    }
+
+    private func live(_ e: Int, _ i: Int) -> some View {
+        let left = startOf(i + 1) - e
+        let next = i + 1 < segs.count ? "بعدها زيد لـ " + speed(segs[i + 1].speed) : "بعدها تخلص"
+        return HStack(alignment: .center, spacing: T.s3) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: "المقطع \(i + 1) من \(segs.count) · على " + speed(segs[i].speed))
+                    .font(T.f(13)).foregroundStyle(T.muted)
+                Text(verbatim: RestTimes.label(left))
+                    .font(T.f(30, .bold)).monospacedDigit().foregroundStyle(T.accent)
+                Text(verbatim: next + " · مضى " + RestTimes.label(e))
+                    .font(T.f(13)).foregroundStyle(T.muted).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            SmallButton(text: "وقّف") { stop() }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, T.s3)
+        .sensoryFeedback(.impact, trigger: i)
+    }
+
+    private func segRow(_ i: Int, _ g: GymLog, active: Bool) -> some View {
+        let hr = g.walkHR?[String(i)]
+        return HStack(spacing: T.s3) {
+            Circle().fill(active ? T.accent : Color.clear).frame(width: 6, height: 6)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: "\(segs[i].min) د على " + speed(segs[i].speed))
+                    .font(T.f(15, active ? .bold : .regular)).foregroundStyle(T.ink)
+                Text(i == 0 ? "نبضك بالبداية" : "نبضك عند التحويل")
+                    .font(T.f(13)).foregroundStyle(T.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            CellField(initial: hr.map(String.init) ?? "", decimal: false,
+                      label: i == 0 ? "النبض بالبداية" : "النبض عند التحويل \(i)") { v in
+                life.updateGym(day) { g in
+                    var m = g.walkHR ?? [:]
+                    m[String(i)] = NumParse.int(v)
+                    g.walkHR = m.isEmpty ? nil : m
+                }
+            }
+            .frame(width: 64)
+        }
+        .padding(.leading, 12).padding(.trailing, 18)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - الإشعارات
+
+    private func start() {
+        life.updateGym(day) {
+            $0.walkStart = Date().timeIntervalSince1970
+            $0.walk = false
+        }
+        cancel()
+        let center = UNUserNotificationCenter.current()
+        for i in 1..<max(1, segs.count) {
+            let c = UNMutableNotificationContent()
+            c.title = "زيد السرعة لـ " + LFmt.weight(segs[i].speed)
+            c.body = "المقطع \(i + 1) · \(segs[i].min) د · سجّل نبضك"
+            c.sound = .default
+            c.interruptionLevel = .timeSensitive
+            let t = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(startOf(i)), repeats: false)
+            center.add(UNNotificationRequest(identifier: "walk-\(i)", content: c, trigger: t))
+        }
+        let c = UNMutableNotificationContent()
+        c.title = "خلص المشي"
+        c.body = "\(total / 60) د"
+        c.sound = .default
+        let t = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, total)), repeats: false)
+        center.add(UNNotificationRequest(identifier: "walk-end", content: c, trigger: t))
+    }
+
+    private func stop() {
+        cancel()
+        life.act("تم: المشي") { life.updateGym(day) { $0.walk = true } }
+    }
+
+    private func cancel() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: (1..<max(2, segs.count + 1)).map { "walk-\($0)" } + ["walk-end"])
     }
 }
 
