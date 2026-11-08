@@ -221,6 +221,8 @@ struct GymLog: Codable, Hashable {
     var poolMin: Int? = nil
     var walkStart: Double? = nil          // متى بدا المشي (ثواني من 1970)
     var walkHR: [String: Int]? = nil      // النبض عند بداية كل مقطع: "0" البداية، "1" أول تحويل…
+    var walkMin: [String: Int]? = nil     // الدقايق الفعلية لكل مقطع إذا غيرها
+    var walkSpeed: [String: Double]? = nil  // السرعة الفعلية لكل مقطع إذا غيرها
 }
 
 // MARK: - الصحة

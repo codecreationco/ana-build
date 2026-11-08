@@ -193,131 +193,165 @@ private struct GymView: View {
     }
 }
 
-/// المشي: عداد لكل مقطع، والنبض بالبداية وعند كل تحويل سرعة، وإشعار وقت التحويل
+/// المشي: جدول مثل تمارين المقاومة (الوقت، السرعة، النبض)، وعداد لكل مقطع، وإشعار وقت التحويل
 private struct WalkCard: View {
     @EnvironmentObject var life: LifeStore
     let day: String
     let w: WorkoutDay
 
-    private var segs: [WalkSeg] { w.walk }
-    /// بداية المقطع بالثواني من أول المشي
-    private func startOf(_ i: Int) -> Int { segs.prefix(i).reduce(0) { $0 + $1.min } * 60 }
-    private var total: Int { startOf(segs.count) }
-    private func index(at e: Int) -> Int { (0..<segs.count).last { startOf($0) <= e } ?? 0 }
+    /// المقاطع بعد تعديلات حسن (إذا غير الوقت أو السرعة)
+    private func segs(_ g: GymLog) -> [WalkSeg] {
+        w.walk.enumerated().map { i, s in
+            WalkSeg(min: g.walkMin?[String(i)] ?? s.min, speed: g.walkSpeed?[String(i)] ?? s.speed)
+        }
+    }
+    private func startOf(_ i: Int, _ segs: [WalkSeg]) -> Int { segs.prefix(i).reduce(0) { $0 + $1.min } * 60 }
     private func speed(_ v: Double) -> String { "\u{2066}" + LFmt.weight(v) + "\u{2069}" }
 
     var body: some View {
         let g = life.gymLog(day)
-        Card {
-            TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                let el = g.walkStart.map { max(0, Int(ctx.date.timeIntervalSince1970 - $0)) }
-                let over = (el ?? 0) >= total
-                let running = el != nil && !over && !g.walk
-                let cur = el.map { index(at: $0) }
-                VStack(spacing: 0) {
+        let sg = segs(g)
+        let total = startOf(sg.count, sg)
+        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            let el = g.walkStart.map { max(0, Int(ctx.date.timeIntervalSince1970 - $0)) }
+            let over = (el ?? 0) >= total
+            let running = el != nil && !over && !g.walk
+            let cur = el.map { e in (0..<sg.count).last { startOf($0, sg) <= e } ?? 0 }
+            Card {
+                VStack(alignment: .leading, spacing: 0) {
+                    head(g, sg, total, running: running, started: el != nil)
                     if running, let e = el, let i = cur {
-                        live(e, i)
-                    } else {
-                        idle(g, started: el != nil)
+                        live(e, i, sg).padding(.top, T.s3)
                     }
-                    ForEach(segs.indices, id: \.self) { i in
-                        RowLine()
-                        segRow(i, g, active: running && cur == i)
+                    VStack(spacing: 6) {
+                        HStack(spacing: 6) {
+                            col("المقطع").frame(width: 44)
+                            col("الوقت").frame(maxWidth: .infinity)
+                            col("السرعة").frame(width: 64)
+                            col("النبض").frame(width: 64)
+                        }
+                        ForEach(sg.indices, id: \.self) { i in
+                            row(i, g, plan: w.walk[i], active: running && cur == i,
+                                past: g.walk || (el ?? -1) >= startOf(i + 1, sg))
+                        }
                     }
+                    .padding(.top, T.s3)
+                    Text("النبض: الأول بالبداية، والباقي عند كل تحويل سرعة")
+                        .font(T.f(12)).foregroundStyle(T.faint)
+                        .padding(.top, T.s2)
                 }
-                .onChange(of: over) { _, o in
-                    // خلص الوقت والتطبيق مفتوح: نسجل المشي
-                    if o, !g.walk, let e = el, e < total + 5 {
-                        life.act("تم: المشي") { life.updateGym(day) { $0.walk = true } }
-                    }
+                .padding(.horizontal, 18)
+                .padding(.vertical, T.s4)
+            }
+            .onChange(of: over) { _, o in
+                // خلص الوقت والتطبيق مفتوح: نسجل المشي
+                if o, !g.walk, let e = el, e < total + 5 {
+                    life.act("تم: المشي") { life.updateGym(day) { $0.walk = true } }
                 }
             }
         }
     }
 
-    private func idle(_ g: GymLog, started: Bool) -> some View {
-        HStack(spacing: T.s3) {
+    private func col(_ t: String) -> some View {
+        Text(t).font(T.f(12)).foregroundStyle(T.muted).lineLimit(1).minimumScaleFactor(0.8)
+    }
+
+    private func head(_ g: GymLog, _ sg: [WalkSeg], _ total: Int, running: Bool, started: Bool) -> some View {
+        HStack(alignment: .center, spacing: T.s2) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("المشي").font(T.f(17)).foregroundStyle(g.walk ? T.faint : T.ink)
-                Text(verbatim: g.walk ? "خلص · \(total / 60) د" : "\(total / 60) د · \(segs.count) مقاطع")
-                    .font(T.f(14)).foregroundStyle(T.muted)
+                Text("المشي").font(T.f(18)).foregroundStyle(g.walk ? T.faint : T.ink)
+                Text(verbatim: "\(total / 60) د · \(sg.count) مقاطع").font(T.f(14)).foregroundStyle(T.muted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if !g.walk {
-                SmallButton(text: started ? "من جديد" : "ابدأ") { start() }
+            if running {
+                SmallButton(text: "وقّف") { stop() }
+            } else if !g.walk {
+                SmallButton(text: started ? "من جديد" : "ابدأ") { start(sg) }
             }
-            Check(on: g.walk, label: "خلصت المشي") {
+            Check(on: g.walk, label: "خلصت المشي", hit: 40) {
                 life.act(g.walk ? "رجعت: المشي" : "تم: المشي") { life.toggleWalk(day) }
                 if !g.walk { cancel() }
             }
         }
-        .padding(.leading, 18).padding(.trailing, 8)
-        .padding(.vertical, 10)
     }
 
-    private func live(_ e: Int, _ i: Int) -> some View {
-        let left = startOf(i + 1) - e
-        let next = i + 1 < segs.count ? "بعدها زيد لـ " + speed(segs[i + 1].speed) : "بعدها تخلص"
-        return HStack(alignment: .center, spacing: T.s3) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(verbatim: "المقطع \(i + 1) من \(segs.count) · على " + speed(segs[i].speed))
-                    .font(T.f(13)).foregroundStyle(T.muted)
-                Text(verbatim: RestTimes.label(left))
-                    .font(T.f(30, .bold)).monospacedDigit().foregroundStyle(T.accent)
-                Text(verbatim: next + " · مضى " + RestTimes.label(e))
-                    .font(T.f(13)).foregroundStyle(T.muted).lineLimit(1).minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            SmallButton(text: "وقّف") { stop() }
+    private func live(_ e: Int, _ i: Int, _ sg: [WalkSeg]) -> some View {
+        let left = startOf(i + 1, sg) - e
+        let next = i + 1 < sg.count ? "بعدها زيد لـ " + speed(sg[i + 1].speed) : "بعدها تخلص"
+        return VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: "المقطع \(i + 1) من \(sg.count) · على " + speed(sg[i].speed))
+                .font(T.f(13)).foregroundStyle(T.muted)
+            Text(verbatim: RestTimes.label(left))
+                .font(T.f(30, .bold)).monospacedDigit().foregroundStyle(T.accent)
+            Text(verbatim: next + " · مضى " + RestTimes.label(e))
+                .font(T.f(13)).foregroundStyle(T.muted).lineLimit(1).minimumScaleFactor(0.8)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, T.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 14).fill(T.card2))
         .sensoryFeedback(.impact, trigger: i)
     }
 
-    private func segRow(_ i: Int, _ g: GymLog, active: Bool) -> some View {
-        let hr = g.walkHR?[String(i)]
-        return HStack(spacing: T.s3) {
-            Circle().fill(active ? T.accent : Color.clear).frame(width: 6, height: 6)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(verbatim: "\(segs[i].min) د على " + speed(segs[i].speed))
-                    .font(T.f(15, active ? .bold : .regular)).foregroundStyle(T.ink)
-                Text(i == 0 ? "نبضك بالبداية" : "نبضك عند التحويل")
-                    .font(T.f(13)).foregroundStyle(T.muted)
+    private func row(_ i: Int, _ g: GymLog, plan: WalkSeg, active: Bool, past: Bool) -> some View {
+        let k = String(i)
+        let m = g.walkMin?[k] ?? plan.min
+        let v = g.walkSpeed?[k] ?? plan.speed
+        return HStack(spacing: 6) {
+            Text(verbatim: "\(i + 1)")
+                .font(T.f(15, active ? .bold : .regular)).monospacedDigit()
+                .foregroundStyle(active ? T.accent : T.muted)
+                .frame(width: 44)
+            CellField(initial: String(m), decimal: false, dimmed: past, label: "دقايق المقطع \(i + 1)") { t in
+                life.updateGym(day) { x in
+                    var d = x.walkMin ?? [:]
+                    d[k] = NumParse.int(t)
+                    x.walkMin = d.isEmpty ? nil : d
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            CellField(initial: hr.map(String.init) ?? "", decimal: false,
-                      label: i == 0 ? "النبض بالبداية" : "النبض عند التحويل \(i)") { v in
-                life.updateGym(day) { g in
-                    var m = g.walkHR ?? [:]
-                    m[String(i)] = NumParse.int(v)
-                    g.walkHR = m.isEmpty ? nil : m
+            .frame(maxWidth: .infinity)
+            CellField(initial: LFmt.weight(v), dimmed: past, label: "سرعة المقطع \(i + 1)") { t in
+                life.updateGym(day) { x in
+                    var d = x.walkSpeed ?? [:]
+                    d[k] = NumParse.double(t)
+                    x.walkSpeed = d.isEmpty ? nil : d
+                }
+            }
+            .frame(width: 64)
+            CellField(initial: g.walkHR?[k].map(String.init) ?? "", decimal: false, dimmed: past,
+                      label: i == 0 ? "النبض بالبداية" : "النبض عند التحويل \(i)") { t in
+                life.updateGym(day) { x in
+                    var d = x.walkHR ?? [:]
+                    d[k] = NumParse.int(t)
+                    x.walkHR = d.isEmpty ? nil : d
                 }
             }
             .frame(width: 64)
         }
-        .padding(.leading, 12).padding(.trailing, 18)
-        .padding(.vertical, 8)
+        .overlay(alignment: .leading) {
+            if active { RoundedRectangle(cornerRadius: 2).fill(T.accent).frame(width: 3, height: 24).offset(x: -12) }
+        }
     }
 
     // MARK: - الإشعارات
 
-    private func start() {
+    private func start(_ sg: [WalkSeg]) {
         life.updateGym(day) {
             $0.walkStart = Date().timeIntervalSince1970
             $0.walk = false
         }
         cancel()
         let center = UNUserNotificationCenter.current()
-        for i in 1..<max(1, segs.count) {
+        for i in 1..<max(1, sg.count) {
             let c = UNMutableNotificationContent()
-            c.title = "زيد السرعة لـ " + LFmt.weight(segs[i].speed)
-            c.body = "المقطع \(i + 1) · \(segs[i].min) د · سجّل نبضك"
+            c.title = "زيد السرعة لـ " + LFmt.weight(sg[i].speed)
+            c.body = "المقطع \(i + 1) · \(sg[i].min) د · سجّل نبضك"
             c.sound = .default
             c.interruptionLevel = .timeSensitive
-            let t = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(startOf(i)), repeats: false)
+            let t = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(startOf(i, sg)), repeats: false)
             center.add(UNNotificationRequest(identifier: "walk-\(i)", content: c, trigger: t))
         }
+        let total = startOf(sg.count, sg)
         let c = UNMutableNotificationContent()
         c.title = "خلص المشي"
         c.body = "\(total / 60) د"
@@ -333,7 +367,7 @@ private struct WalkCard: View {
 
     private func cancel() {
         UNUserNotificationCenter.current().removePendingNotificationRequests(
-            withIdentifiers: (1..<max(2, segs.count + 1)).map { "walk-\($0)" } + ["walk-end"])
+            withIdentifiers: (1..<21).map { "walk-\($0)" } + ["walk-end"])
     }
 }
 
