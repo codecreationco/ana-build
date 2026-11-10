@@ -62,7 +62,7 @@ struct RecorderCard: View {
         switch st {
         case "requested", "joining": return "التسجيل يدخل الدرس…"
         case "waiting": return "التسجيل ينطر يدخلونه"
-        case "in_call": return cmd == "record" ? "يبدأ التسجيل…" : "التسجيل داخل · ما يسجل"
+        case "in_call": return cmd == "record" ? "يبدأ التسجيل…" : (isMeet(r) ? "جاهز يسجل" : "التسجيل داخل · ما يسجل")
         case "recording": return cmd == "pause" ? "يوقف…" : (cmd == "stop" ? "يخلص…" : "يسجل " + secs)
         case "paused": return cmd == "record" ? "يكمل…" : (cmd == "stop" ? "يخلص…" : "موقف · " + secs)
         case "saving": return "يحفظ الملف…"
@@ -73,6 +73,11 @@ struct RecorderCard: View {
         }
     }
 
+    /// الميت: حسن يدخّل «التسجيل» بنفسه، والبرنامج يسجل الخط الافتراضي
+    private func isMeet(_ r: RecSession) -> Bool {
+        (r.course.flatMap { life.course($0) }?.link ?? "").contains("meet.google")
+    }
+
     private func detail(_ r: RecSession) -> String {
         let st = r.state ?? ""
         if r.active && !r.recorderAlive { return "شغّل اللابتوب، والبرنامج يدخل بروحه" }
@@ -80,6 +85,7 @@ struct RecorderCard: View {
         case "waiting":
             let meet = (r.course.flatMap { life.course($0) }?.link ?? "").contains("meet.google")
             return title(r) + (meet ? " · اقبله من الاجتماع" : " · الأستاذ يدخّله")
+        case "in_call" where isMeet(r): return "دخّل «التسجيل» من كروم اللابتوب، وبعدين ابدأ"
         case "done": return r.file ?? title(r)
         case "failed": return r.error ?? title(r)
         default: return title(r)
