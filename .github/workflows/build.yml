@@ -57,7 +57,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            MARKETING_VERSION="0.2.${{ github.run_number }}" CURRENT_PROJECT_VERSION="$((100 + ${{ github.run_number }}))" \
+            MARKETING_VERSION="0.3.$(( ${{ github.run_number }} - 18 ))" CURRENT_PROJECT_VERSION="$((100 + ${{ github.run_number }}))" \
             build 2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
           # نتأكد إن البناء نجح فعلاً: الملف التنفيذي والويدجت موجودين
           grep -q "BUILD SUCCEEDED" build.log
@@ -78,7 +78,7 @@ jobs:
           codesign -d --entitlements - "$APP/PlugIns/AnaWidget.appex" 2>/dev/null | grep -c application-groups
           mkdir -p Payload
           cp -R "$APP" Payload/
-          zip -qry "Ana-0.2.${{ github.run_number }}.ipa" Payload
+          zip -qry "Ana-0.3.$(( ${{ github.run_number }} - 18 )).ipa" Payload
           ls -lh Ana-*.ipa
 
       - uses: actions/upload-artifact@v4
@@ -91,7 +91,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # رقم النسخة: 0.1.<رقم البناء>، ويطلع فوق جنب «أنا» داخل التطبيق
-          VER="0.2.${{ github.run_number }}"
+          VER="0.3.$(( ${{ github.run_number }} - 18 ))"
           TAG="build-${{ github.run_number }}"
           gh release create "$TAG" "Ana-$VER.ipa" --title "حسن · $VER" --notes "commit ${{ github.sha }}" --latest
 
