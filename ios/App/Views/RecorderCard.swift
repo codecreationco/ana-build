@@ -28,6 +28,7 @@ struct RecorderCard: View {
     }
 
     private func title(_ r: RecSession) -> String {
+        if r.course == "adhoc" { return r.title ?? "تسجيل من رابط" }
         let c = r.course.flatMap { life.course($0) }
         let name = c?.shortName ?? r.course ?? ""
         return r.num.map { "\(name) · \($0)" } ?? name
@@ -75,7 +76,7 @@ struct RecorderCard: View {
 
     /// الميت: حسن يدخّل «التسجيل» بنفسه، والبرنامج يسجل الخط الافتراضي
     private func isMeet(_ r: RecSession) -> Bool {
-        (r.course.flatMap { life.course($0) }?.link ?? "").contains("meet.google")
+        (r.url ?? r.course.flatMap { life.course($0) }?.link ?? "").contains("meet.google")
     }
 
     private func detail(_ r: RecSession) -> String {
@@ -83,7 +84,7 @@ struct RecorderCard: View {
         if r.active && !r.recorderAlive { return "شغّل اللابتوب، والبرنامج يدخل بروحه" }
         switch st {
         case "waiting":
-            let meet = (r.course.flatMap { life.course($0) }?.link ?? "").contains("meet.google")
+            let meet = isMeet(r)
             return title(r) + (meet ? " · اقبله من الاجتماع" : " · الأستاذ يدخّله")
         case "in_call" where isMeet(r): return "دخّل «التسجيل» من كروم اللابتوب، وبعدين ابدأ"
         case "done": return r.file ?? title(r)

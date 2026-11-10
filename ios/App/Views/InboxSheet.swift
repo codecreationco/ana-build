@@ -5,11 +5,15 @@ import UIKit
 struct InboxButton: View {
     @EnvironmentObject var life: LifeStore
     @State private var open = false
+    @State private var record = false
 
     var body: some View {
-        Button { open = true } label: {
-            Image(systemName: "square.and.pencil")
-                .font(.system(size: 16, weight: .regular))
+        Menu {
+            Button { open = true } label: { Label("ملاحظة", systemImage: "square.and.pencil") }
+            Button { record = true } label: { Label("سجّل درس من رابط", systemImage: "record.circle") }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 17, weight: .regular))
                 .foregroundStyle(T.ink)
                 .frame(width: 40, height: 40)
                 .background(Circle().fill(T.card2))
@@ -27,8 +31,7 @@ struct InboxButton: View {
                     }
                 }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("الدفتر")
+        .accessibilityLabel("إضافة")
         .sheet(isPresented: $open) {
             InboxSheet()
                 .environmentObject(life)
@@ -37,6 +40,117 @@ struct InboxButton: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $record) {
+            LinkRecordSheet()
+                .environmentObject(life)
+                .environment(\.layoutDirection, .rightToLeft)
+                .preferredColorScheme(.dark)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+}
+
+/// تسجيل أي درس من رابط: «التسجيل» يدخل وياك، والملف ينحفظ بأول مجلد الدروب بوكس
+struct LinkRecordSheet: View {
+    @EnvironmentObject var life: LifeStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var link = ""
+    @State private var name = ""
+    @State private var startNow = true
+
+    private var url: URL? {
+        let t = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let u = URL(string: t), let h = u.host, u.scheme?.hasPrefix("http") == true, !h.isEmpty else { return nil }
+        return u
+    }
+    private var isMeet: Bool { url?.host?.contains("meet.google") == true }
+
+    var body: some View {
+        ZStack {
+            T.bg.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("سجّل درس").font(T.f(28, .bold)).foregroundStyle(T.ink)
+                            Text("أي رابط زوم أو ميت، والملف ينحفظ بالدروب بوكس").font(T.f(13)).foregroundStyle(T.muted)
+                        }
+                        Spacer()
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(T.muted)
+                                .frame(width: 44, height: 44)
+                                .background(Circle().fill(T.card2))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("سكّر")
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            TextField("الرابط", text: $link)
+                                .font(T.f(15))
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .environment(\.layoutDirection, .leftToRight)
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(T.card2))
+                            SmallButton(text: "الصق") {
+                                if let s = UIPasteboard.general.string { link = s.trimmingCharacters(in: .whitespacesAndNewlines) }
+                            }
+                        }
+                        TextField("اسم الملف (اختياري)", text: $name)
+                            .font(T.f(15))
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(T.card2))
+                        if url != nil {
+                            Text(isMeet ? "ميت: دخّل «التسجيل» من كروم اللابتوب، والبرنامج يسجل الصوت"
+                                        : "التسجيل يدخل بروحه، وإذا فيه غرفة انتظار لازم أحد يقبله")
+                                .font(T.f(13)).foregroundStyle(T.muted)
+                        }
+                    }
+                    .card()
+
+                    Card {
+                        ValueRow(title: "يبدأ يسجل على طول", sub: startNow ? "من أول ما يدخل" : "تبدأه إنت من الكرت بالرئيسية") {
+                            Switch(on: startNow, label: "يبدأ يسجل على طول") { startNow.toggle() }
+                        }
+                    }
+
+                    HStack(spacing: 10) {
+                        Button { go(open: true) } label: {
+                            Text("ادخل وسجّل")
+                                .font(T.f(15, .semibold))
+                                .foregroundStyle(T.pillInk)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                                .background(Capsule().fill(T.pill))
+                        }
+                        .buttonStyle(.plain)
+                        Button { go(open: false) } label: {
+                            Text("سجّل بس")
+                                .font(T.f(15, .semibold))
+                                .foregroundStyle(T.ink)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                                .background(Capsule().fill(T.card2))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .disabled(url == nil)
+                    .opacity(url == nil ? 0.5 : 1)
+                }
+                .padding(16)
+            }
+        }
+    }
+
+    private func go(open: Bool) {
+        guard let u = url else { return }
+        life.recAdhoc(url: u.absoluteString, title: name, start: startNow)
+        if open { UIApplication.shared.open(u) }
+        dismiss()
     }
 }
 

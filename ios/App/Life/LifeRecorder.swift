@@ -6,6 +6,8 @@ struct RecSession: Decodable, Equatable {
     var id: Int?
     var course: String?
     var num: Int?
+    var url: String?
+    var title: String?
     var cmd: String?
     var state: String?
     var stateAt: String?
@@ -77,6 +79,20 @@ extension LifeStore {
             // داخل أصلاً لنفس المادة: لا نعيده
             if let r = rec, r.active, r.course == c.id { return }
             await recCall(["p_course": c.id, "p_num": num, "p_url": link, "p_cmd": "join"])
+        }
+    }
+
+    /// أي رابط (مو من المواد): «التسجيل» يدخل، وإذا start يبدأ يسجل على طول
+    func recAdhoc(url: String, title: String, start: Bool) {
+        guard !Snap.on else { return }
+        Task {
+            do {
+                let o = try await LifeSync.rpc("rec_adhoc", ["p_key": DeviceKey.get(), "p_url": url, "p_title": title,
+                                                           "p_cmd": start ? "record" : "join"])
+                if let r = LifeSync.recDecode(o), r.id != nil { rec = r }
+            } catch {
+                toast = UndoToast(text: "ما وصل الأمر للتسجيل")
+            }
         }
     }
 
