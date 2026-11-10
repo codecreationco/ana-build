@@ -50,6 +50,13 @@ struct RecSession: Decodable, Equatable {
     }
 }
 
+/// زر انضغط وللحين اللابتوب ما رد
+struct RecPending: Equatable {
+    var cmd: String
+    var at: Date
+    var sec: Int
+}
+
 extension LifeSync {
     static func recDecode(_ o: Any) -> RecSession? {
         guard let data = try? JSONSerialization.data(withJSONObject: o) else { return nil }
@@ -60,6 +67,23 @@ extension LifeSync {
 }
 
 extension LifeStore {
+    /// اللي ينعرض: حالة اللابتوب، والزر اللي انضغط يبين أثره على طول (وقّف يوقف العداد، وخلّص يحفظ)
+    var recShown: RecSession? {
+        guard var r = rec else { return nil }
+        guard let p = recPending, Date().timeIntervalSince(p.at) < 15 else { return r }
+        let st = r.state ?? ""
+        switch p.cmd {
+        case "pause" where st == "recording":
+            r.state = "paused"; r.recSec = p.sec; r.stateAt = nil
+        case "stop" where st == "recording" || st == "paused" || st == "in_call":
+            r.state = "saving"; r.recSec = p.sec; r.stateAt = nil
+        case "cancel" where r.active:
+            r.state = "cancelled"; r.stateAt = ISO8601DateFormatter().string(from: Date())
+        default: break
+        }
+        return r
+    }
+
     /// رقم درس اليوم للمادة
     func todayNumber(_ c: Course) -> Int? {
         c.mode == .teach ? teachNumber(c, on: today) : lessonNumber(c, on: today)
@@ -79,6 +103,7 @@ extension LifeStore {
             // داخل أصلاً لنفس المادة: لا نعيده
             if let r = rec, r.active, r.course == c.id { return }
             await recCall(["p_course": c.id, "p_num": num, "p_url": link, "p_cmd": "join"])
+            recKick += 1
         }
     }
 
@@ -90,6 +115,7 @@ extension LifeStore {
                 let o = try await LifeSync.rpc("rec_adhoc", ["p_key": DeviceKey.get(), "p_url": url, "p_title": title,
                                                            "p_cmd": start ? "record" : "join"])
                 if let r = LifeSync.recDecode(o), r.id != nil { rec = r }
+                recKick += 1
             } catch {
                 toast = UndoToast(text: "ما وصل الأمر للتسجيل")
             }
@@ -98,6 +124,8 @@ extension LifeStore {
 
     func recSend(_ cmd: String) {
         guard !Snap.on else { return }
+        recPending = RecPending(cmd: cmd, at: Date(), sec: recShown?.seconds(at: Date()) ?? 0)
+        recKick += 1
         rec?.cmd = cmd
         Task { await recCall(["p_course": rec?.course ?? "", "p_num": NSNull(), "p_url": "", "p_cmd": cmd]) }
     }
@@ -118,6 +146,18 @@ extension LifeStore {
         if let o = try? await LifeSync.rpc("rec_get", ["p_key": DeviceKey.get()]) {
             let r = LifeSync.recDecode(o)
             if r != rec { rec = r }
+            // وصل رد اللابتوب على الزر
+            if let p = recPending {
+                let st = r?.state ?? ""
+                let done: Bool
+                switch p.cmd {
+                case "record": done = st == "recording"
+                case "pause": done = st == "paused"
+                case "stop", "cancel": done = !(r?.active ?? false) || st == "saving"
+                default: done = true
+                }
+                if done || Date().timeIntervalSince(p.at) > 15 { recPending = nil }
+            }
         }
     }
 }

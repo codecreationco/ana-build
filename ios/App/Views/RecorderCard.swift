@@ -10,7 +10,7 @@ struct RecorderCard: View {
 
     var body: some View {
         Group {
-            if let r = life.rec, r.id != nil, r.recent, course == nil || r.course == course {
+            if let r = life.recShown, r.id != nil, r.recent, course == nil || r.course == course {
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     Card { content(r, ctx.date) }
                 }
@@ -120,7 +120,7 @@ struct RecDot: View {
     @State private var open = false
 
     var body: some View {
-        if let r = life.rec, r.active {
+        if let r = life.recShown, r.active {
             let st = r.state ?? ""
             Button { open = true } label: {
                 RecMark(state: st, size: 40)
@@ -191,7 +191,7 @@ struct RecorderSheet: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("سكّر")
                 }
-                if let r = life.rec, r.id != nil, r.recent {
+                if let r = life.recShown, r.id != nil, r.recent {
                     TimelineView(.periodic(from: .now, by: 1)) { ctx in
                         info(r, ctx.date)
                     }

@@ -25,12 +25,12 @@ struct AppRoot: View {
             await life.pull()
             life.writeWidget()
         }
-        .task {
-            // التسجيل: نسأل دايماً، كل ٣ ثواني وهو شغال وكل ١٥ ثانية غير جذي
+        .task(id: life.recKick) {
+            // التسجيل: نسأل دايماً، كل ثانية وهو شغال وكل ١٠ ثواني غير جذي. أي زر يعيد العد من جديد
             while !Task.isCancelled {
                 if phase == .active { await life.recRefresh() }
-                let active = life.rec?.active == true
-                try? await Task.sleep(nanoseconds: active ? 3_000_000_000 : 15_000_000_000)
+                let active = life.rec?.active == true || life.recPending != nil
+                try? await Task.sleep(nanoseconds: active ? 1_000_000_000 : 10_000_000_000)
             }
         }
         .onChange(of: phase) { _, p in

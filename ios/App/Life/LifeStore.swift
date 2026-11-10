@@ -16,6 +16,10 @@ final class LifeStore: ObservableObject {
     @Published var sync: String = ""
     /// آخر جلسة تسجيل درس (من اللابتوب)
     @Published var rec: RecSession? = nil
+    /// آخر زر انضغط وللحين ما وصل رده من اللابتوب (عشان الشاشة ترد على طول)
+    @Published var recPending: RecPending? = nil
+    /// يتغير مع كل أمر، عشان التحديث يبدأ على طول
+    @Published var recKick = 0
     private var pushTask: Task<Void, Never>?
     private var pulling = false
     /// إذا ملف السيرفر ما انقرا، ما نكتب فوقه لين ينصلح
