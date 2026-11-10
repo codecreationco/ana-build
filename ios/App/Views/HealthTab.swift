@@ -230,18 +230,28 @@ private struct WalkCard: View {
                             col("السرعة").frame(width: 64)
                             col("النبض").frame(width: 64)
                         }
+                        preRow(g, past: el != nil || g.walk)
                         ForEach(sg.indices, id: \.self) { i in
                             row(i, g, plan: w.walk[i], active: running && cur == i,
                                 past: g.walk || (el ?? -1) >= startOf(i + 1, sg))
                         }
                     }
                     .padding(.top, T.s3)
-                    Text("النبض: الأول بالبداية، والباقي عند كل تحويل سرعة")
+                    Text("النبض: قبل لا تبدأ، وبآخر كل مقطع (وقت التحويل)")
                         .font(T.f(12)).foregroundStyle(T.faint)
                         .padding(.top, T.s2)
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, T.s4)
+            }
+            .onAppear {
+                // قبل: النبض اللي انكتب بأول سطر قبل لا يبدأ كان «قبل لا تبدأ»
+                if g.walkStart == nil, g.walkHR?["pre"] == nil, let v = g.walkHR?["0"] {
+                    life.updateGym(day) { x in
+                        x.walkHR?["pre"] = v
+                        x.walkHR?["0"] = nil
+                    }
+                }
             }
             .onChange(of: over) { _, o in
                 // خلص الوقت والتطبيق مفتوح: نسجل المشي
@@ -293,6 +303,25 @@ private struct WalkCard: View {
         .sensoryFeedback(.impact, trigger: i)
     }
 
+    /// سطر قبل لا تبدأ: النبض بس
+    private func preRow(_ g: GymLog, past: Bool) -> some View {
+        HStack(spacing: 6) {
+            Text("قبل").font(T.f(14)).foregroundStyle(T.muted).frame(width: 44)
+            Text("قبل لا تبدأ").font(T.f(14)).foregroundStyle(T.faint)
+                .frame(maxWidth: .infinity)
+            Color.clear.frame(width: 64, height: 40)
+            CellField(initial: g.walkHR?["pre"].map(String.init) ?? "", decimal: false, dimmed: past,
+                      label: "النبض قبل لا تبدأ") { t in
+                life.updateGym(day) { x in
+                    var d = x.walkHR ?? [:]
+                    d["pre"] = NumParse.int(t)
+                    x.walkHR = d.isEmpty ? nil : d
+                }
+            }
+            .frame(width: 64)
+        }
+    }
+
     private func row(_ i: Int, _ g: GymLog, plan: WalkSeg, active: Bool, past: Bool) -> some View {
         let k = String(i)
         let m = g.walkMin?[k] ?? plan.min
@@ -319,7 +348,7 @@ private struct WalkCard: View {
             }
             .frame(width: 64)
             CellField(initial: g.walkHR?[k].map(String.init) ?? "", decimal: false, dimmed: past,
-                      label: i == 0 ? "النبض بالبداية" : "النبض عند التحويل \(i)") { t in
+                      label: "النبض بآخر المقطع \(i + 1)") { t in
                 life.updateGym(day) { x in
                     var d = x.walkHR ?? [:]
                     d[k] = NumParse.int(t)
@@ -354,7 +383,7 @@ private struct WalkCard: View {
         let total = startOf(sg.count, sg)
         let c = UNMutableNotificationContent()
         c.title = "خلص المشي"
-        c.body = "\(total / 60) د"
+        c.body = "\(total / 60) د · سجّل نبضك"
         c.sound = .default
         let t = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, total)), repeats: false)
         center.add(UNNotificationRequest(identifier: "walk-end", content: c, trigger: t))
