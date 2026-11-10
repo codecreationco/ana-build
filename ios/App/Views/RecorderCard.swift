@@ -100,7 +100,7 @@ struct RecorderCard: View {
             }
         case "recording":
             HStack(spacing: 6) {
-                SmallButton(text: "وقّف مؤقت") { life.recSend("pause") }
+                SmallButton(text: "وقّف") { life.recSend("pause") }
                 PillButton(text: "خلّص") { life.recSend("stop") }
             }
         case "paused":
