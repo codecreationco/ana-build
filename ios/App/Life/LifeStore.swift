@@ -14,6 +14,8 @@ final class LifeStore: ObservableObject {
 
     /// حالة الربط بقاعدة البيانات (تطلع صغيرة بالرئيسية)
     @Published var sync: String = ""
+    /// آخر جلسة تسجيل درس (من اللابتوب)
+    @Published var rec: RecSession? = nil
     private var pushTask: Task<Void, Never>?
     private var pulling = false
     /// إذا ملف السيرفر ما انقرا، ما نكتب فوقه لين ينصلح
@@ -31,6 +33,9 @@ final class LifeStore: ObservableObject {
     init() {
         if Snap.on {
             d = LifeSample.make()
+            // للتصوير: كرت التسجيل وهو يسجل
+            rec = RecSession(id: 1, course: "faraid", num: 75, cmd: "record", state: "recording",
+                             stateAt: nil, recSec: 754, file: nil, error: nil, recorderSeen: "2099-01-01T00:00:00Z")
         } else if let data = try? Data(contentsOf: Self.url),
                   let saved = try? JSONDecoder().decode(LifeData.self, from: data) {
             d = saved

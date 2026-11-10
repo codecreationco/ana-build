@@ -234,8 +234,8 @@ private struct TodayList: View {
                                     done: it.done, next: it.id == next?.id) { tap(it) }
                                 .contextMenu {
                                     if let c = life.course(of: it), it.time != nil {
-                                        if let s = c.link, let url = URL(string: s) {
-                                            Link(destination: url) { Label("ادخل الدرس", systemImage: "video") }
+                                        if c.link != nil {
+                                            Button { life.enterLesson(c) } label: { Label("ادخل الدرس", systemImage: "video") }
                                         }
                                         Button { life.act("ماكو درس اليوم: \(c.shortName)") { life.toggleNoLesson(c, life.today) } } label: {
                                             Label("اليوم ماكو درس", systemImage: "xmark.circle")

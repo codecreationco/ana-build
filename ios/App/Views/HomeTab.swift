@@ -41,6 +41,7 @@ struct HomeTab: View {
                 .padding(.top, T.s4)
             StatusLineView()
                 .padding(.top, T.s4)
+            RecorderCard()
             SummaryCard(items: items) { go(1, 0) }
                 .padding(.top, T.s3)
             SecLabel(text: "مساحاتي", center: true)
@@ -243,8 +244,8 @@ struct StatusLineView: View {
                             .padding(.horizontal, 6).frame(minHeight: 44).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    if let s = c.link, let url = URL(string: s) {
-                        Link(destination: url) {
+                    if c.link != nil {
+                        Button { life.enterLesson(c) } label: {
                             Text("ادخل")
                                 .font(T.f(15, .bold))
                                 .foregroundStyle(T.pillInk)
@@ -253,6 +254,7 @@ struct StatusLineView: View {
                                 .background(RoundedRectangle(cornerRadius: 10).fill(T.pill))
                                 .frame(minHeight: 44)
                         }
+                        .buttonStyle(.plain)
                         .accessibilityLabel("ادخل الدرس")
                     }
                 }

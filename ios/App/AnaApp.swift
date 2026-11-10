@@ -20,7 +20,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         if let s = response.notification.request.content.userInfo["link"] as? String, let url = URL(string: s) {
-            DispatchQueue.main.async { UIApplication.shared.open(url) }
+            DispatchQueue.main.async {
+                // يفتح الدرس، ويرسل «التسجيل» يدخل وياك
+                if let life = LifeStore.current, let c = life.d.courses.first(where: { $0.link == s }) {
+                    life.enterLesson(c)
+                } else {
+                    UIApplication.shared.open(url)
+                }
+            }
         }
         completionHandler()
     }

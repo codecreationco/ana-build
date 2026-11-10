@@ -283,8 +283,8 @@ struct CourseDetail: View {
                 if let r = c.reportLastText { Foot(text: "آخر عبارة بالتقرير: " + r, center: false) }
                 if c.mode != .recording {
                     Card {
-                        if let s = c.link, let url = URL(string: s) {
-                            Link(destination: url) {
+                        if c.link != nil {
+                            Button { life.enterLesson(c) } label: {
                                 HStack(spacing: T.s3) {
                                     Image(systemName: "video").font(.system(size: 17)).foregroundStyle(T.muted).frame(width: 22)
                                     Text("ادخل الدرس").font(T.f(18)).foregroundStyle(T.ink)
@@ -293,6 +293,7 @@ struct CourseDetail: View {
                                 }
                                 .padding(.horizontal, 18).frame(minHeight: 52).contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                             RowLine()
                         }
                         let todayOn = c.days.contains(DateKit.weekday(life.today))
@@ -308,6 +309,7 @@ struct CourseDetail: View {
                         }
                     }
                     .padding(.top, T.s3)
+                    RecorderCard(course: c.id)
                 }
                 SecLabel(text: "الدروس", trailing: "من الأحدث")
                 LessonList(course: c) { open = LessonRef(num: $0) }
