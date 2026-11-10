@@ -138,8 +138,10 @@ struct RecDot: View {
                         if shown {
                             Text(verbatim: RestTimes.label(r.seconds(at: ctx.date)))
                                 .font(T.f(14, .bold)).monospacedDigit().foregroundStyle(T.ink)
+                                .lineLimit(1)
                         }
                     }
+                    .fixedSize()
                     .padding(.horizontal, shown ? 12 : 15)
                     .frame(height: 40)
                     .background(Capsule().fill(T.card2))
