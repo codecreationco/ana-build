@@ -67,6 +67,7 @@ struct PageHead: View {
             }
             Spacer(minLength: T.s2)
             HStack(spacing: T.s2) {
+                RecDot()
                 InboxButton()
                 MiniAvatar()
             }

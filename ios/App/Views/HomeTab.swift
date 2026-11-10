@@ -17,8 +17,9 @@ struct HomeTab: View {
     var body: some View {
         let items = life.todayItems
         TabPage {
-            HStack {
+            HStack(spacing: T.s2) {
                 Spacer()
+                RecDot()
                 InboxButton()
             }
             OrbitHero(items: items)

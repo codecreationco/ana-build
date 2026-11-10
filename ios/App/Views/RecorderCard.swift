@@ -6,7 +6,7 @@ struct RecorderCard: View {
     /// إذا انعطى: يطلع بس لجلسات هالمادة
     var course: String? = nil
 
-    private static let red = Color(red: 1, green: 0.27, blue: 0.23)
+    static let red = Color(red: 1, green: 0.27, blue: 0.23)
 
     var body: some View {
         Group {
@@ -15,14 +15,6 @@ struct RecorderCard: View {
                     Card { content(r, ctx.date) }
                 }
                 .padding(.top, T.s3)
-            }
-        }
-        .task(id: life.rec?.active ?? false) {
-            // وهو شغال: نحدث كل ٣ ثواني
-            await life.recRefresh()
-            while !Task.isCancelled, life.rec?.active == true {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                await life.recRefresh()
             }
         }
     }
@@ -117,6 +109,94 @@ struct RecorderCard: View {
             }
         default:
             EmptyView()
+        }
+    }
+}
+
+/// الدائرة الحمرا جنب زر «+»: تطلع وقت ما يكون فيه تسجيل، وفيها المدة
+struct RecDot: View {
+    @EnvironmentObject var life: LifeStore
+    @State private var open = false
+
+    var body: some View {
+        if let r = life.rec, r.active {
+            Button { open = true } label: {
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    let st = r.state ?? ""
+                    let rec = st == "recording"
+                    let shown = rec || st == "paused" || st == "saving"
+                    HStack(spacing: 6) {
+                        if st == "paused" {
+                            Image(systemName: "pause.fill").font(.system(size: 11, weight: .bold)).foregroundStyle(RecorderCard.red)
+                        } else {
+                            Circle()
+                                .fill(shown ? RecorderCard.red : Color.clear)
+                                .overlay(Circle().stroke(RecorderCard.red, lineWidth: shown ? 0 : 2))
+                                .frame(width: 10, height: 10)
+                                .opacity(rec && Int(ctx.date.timeIntervalSince1970) % 2 == 1 ? 0.35 : 1)
+                        }
+                        if shown {
+                            Text(verbatim: RestTimes.label(r.seconds(at: ctx.date)))
+                                .font(T.f(14, .bold)).monospacedDigit().foregroundStyle(T.ink)
+                        }
+                    }
+                    .padding(.horizontal, shown ? 12 : 15)
+                    .frame(height: 40)
+                    .background(Capsule().fill(T.card2))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(label(r))
+            .sheet(isPresented: $open) {
+                RecorderSheet()
+                    .environmentObject(life)
+                    .environment(\.layoutDirection, .rightToLeft)
+                    .preferredColorScheme(.dark)
+                    .presentationDetents([.height(260), .medium])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    private func label(_ r: RecSession) -> String {
+        switch r.state ?? "" {
+        case "recording": return "يسجل، اضغط للتحكم"
+        case "paused": return "التسجيل موقف، اضغط للتحكم"
+        default: return "التسجيل، اضغط للتحكم"
+        }
+    }
+}
+
+/// معلومات التسجيل وأزراره (من الدائرة الحمرا)
+struct RecorderSheet: View {
+    @EnvironmentObject var life: LifeStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            T.bg.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("التسجيل").font(T.f(24, .bold)).foregroundStyle(T.ink)
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(T.muted)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(T.card2))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("سكّر")
+                }
+                RecorderCard()
+                if life.rec == nil || life.rec?.recent == false {
+                    Text("ماكو تسجيل الحين").font(T.f(15)).foregroundStyle(T.muted).padding(.top, T.s4)
+                }
+            }
+            .padding(16)
         }
     }
 }

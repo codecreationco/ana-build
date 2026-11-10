@@ -25,12 +25,21 @@ struct AppRoot: View {
             await life.pull()
             life.writeWidget()
         }
+        .task {
+            // التسجيل: نسأل دايماً، كل ٣ ثواني وهو شغال وكل ١٥ ثانية غير جذي
+            while !Task.isCancelled {
+                if phase == .active { await life.recRefresh() }
+                let active = life.rec?.active == true
+                try? await Task.sleep(nanoseconds: active ? 3_000_000_000 : 15_000_000_000)
+            }
+        }
         .onChange(of: phase) { _, p in
             if p == .active {
                 life.advance()
                 LifeNotifier.schedule(life)
                 life.writeWidget()
                 Task { await life.pull(); life.writeWidget() }
+                Task { await life.recRefresh() }
             }
             if p == .background { life.writeWidget() }
         }
