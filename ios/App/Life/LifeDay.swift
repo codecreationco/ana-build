@@ -187,7 +187,7 @@ extension LifeStore {
         return when + " " + a.title + (a.status == .confirmed ? "" : " (\(a.status.label))")
     }
 
-    /// رقم الدرس اللي عليك بيوم جاي حسب الخطة (تقرير المتاجر كل يوم، وتقرير الأصول كل يوم إلا الجمعة)
+    /// رقم الدرس اللي عليك بيوم جاي حسب الخطة (تقرير المتاجر والقطع كل يوم، وتقرير الظن بيوم الدرس)
     func planned(_ c: Course, stage: Int, on day: String) -> Int? {
         let start = logs(on: today, course: c.id, stage: stage).isEmpty ? today : DateKit.add(1, to: today)
         guard day >= start else { return nil }
@@ -196,10 +196,16 @@ extension LifeStore {
             let n = c.stageA + 1 + DateKit.diff(start, day)
             return n <= c.released + DateKit.diff(today, day) ? n : nil
         case .online:
-            guard DateKit.weekday(day) != 6 else { return nil }
+            if c.days.isEmpty {
+                // خلصت الدروس (مثل القطع): تقرير كل يوم لين آخر درس
+                let n = c.stageB + 1 + DateKit.diff(start, day)
+                return n <= c.stageA ? n : nil
+            }
+            // التقرير بنفس يوم الدرس
+            guard held(c, day) else { return nil }
             var n = c.stageB + 1
             var k = start
-            while k < day { if DateKit.weekday(k) != 6 { n += 1 }; k = DateKit.add(1, to: k) }
+            while k < day { if held(c, k) { n += 1 }; k = DateKit.add(1, to: k) }
             return n
         case .teach:
             return nil

@@ -25,6 +25,7 @@ struct Course: Codable, Identifiable, Hashable {
     var asOf: String           // آخر يوم انحسب فيه «released»
     var info: [String: LessonInfo] = [:]   // رقم الدرس ← موضوعه وتفاصيله
     var endsOn: String? = nil      // آخر يوم بالكورس (إذا معروف)، للشبكة
+    var firstLesson: Int? = nil   // أول درس بالمادة (الظن يبدأ من 78)، ما نعرض اللي قبله
     var nick: String? = nil        // اسم قصير: «الأصول» بدال «فرائد الأصول»
     var link: String? = nil        // رابط الدرس (Zoom، Meet…)
     var nextNote: String? = nil    // من المحادثة: شي عن الدرس الجاي

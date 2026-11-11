@@ -119,7 +119,7 @@ struct GridBoard: View {
     @EnvironmentObject var life: LifeStore
     @State private var toEnd = false
 
-    private let cols = ["منطق", "متاجر", "فرائد", "تقرير", "وزان", "نادي", "طلعة"]
+    private let cols = ["منطق", "متاجر", "ظن", "تقرير", "قطع", "وزان", "نادي", "طلعة"]
     private let initials = ["ح", "ن", "ث", "ر", "خ", "ج", "س"]
     private let dayW: CGFloat = 40
     private let apptW: CGFloat = 58
@@ -317,22 +317,19 @@ struct GridBoard: View {
             let s = planStart(c.id, stage: 0)
             guard day >= s else { return GridCell(text: "", state: .none) }
             return GridCell(text: "\(c.stageA + 1 + DateKit.diff(s, day))", state: .planned)
-        case "فرائد":
-            guard let c = life.course("faraid"), life.held(c, day) else { return GridCell(text: "", state: .none) }
+        case "ظن":
+            // حضور الظن
+            guard let c = life.course("zann"), life.held(c, day) else { return GridCell(text: "", state: .none) }
             let v = life.logs(on: day, course: c.id, stage: 0)
             if !v.isEmpty { return GridCell(text: nums(v), state: .done) }
             let n = life.lessonNumber(c, on: day).map(String.init) ?? ""
             return GridCell(text: n, state: passed(day, time: c.time) ? .missed : .planned)
-        case "تقرير":
-            guard let c = life.course("faraid") else { return GridCell(text: "", state: .none) }
+        case "تقرير", "قطع":
+            // تقرير الظن بيوم الدرس، وتقرير القطع كل يوم
+            guard let c = life.course(col == "تقرير" ? "zann" : "faraid") else { return GridCell(text: "", state: .none) }
             let v = life.logs(on: day, course: c.id, stage: 1)
             if !v.isEmpty { return GridCell(text: nums(v), state: .done) }
-            let s = planStart(c.id, stage: 1)
-            guard day >= s, wd != 6 else { return GridCell(text: "", state: .none) }
-            // تقرير واحد كل يوم ما عدا الجمعة
-            var n = c.stageB + 1
-            var k = s
-            while k < day { if DateKit.weekday(k) != 6 { n += 1 }; k = DateKit.add(1, to: k) }
+            guard let n = life.planned(c, stage: 1, on: day) else { return GridCell(text: "", state: .none) }
             return GridCell(text: "\(n)", state: .planned)
         case "وزان":
             let m = life.d.work.first?.logs[day] ?? 0

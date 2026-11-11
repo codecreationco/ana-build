@@ -51,6 +51,7 @@ struct CCourse: Decodable {
     var reportLastText: String?
     var reportLeft: Int?
     var nextNote: String?
+    var firstLesson: Int?
 }
 
 struct CLesson: Decodable {
@@ -213,15 +214,16 @@ extension LifeStore {
                 let attended = max(cc.lastAttended ?? 0, logged0)
                 co = Course(id: cc.id, title: cc.title, book: cc.book ?? "", mode: .online, days: cc.days ?? [], time: cc.time,
                             released: max(cc.lastReceived ?? 0, attended), stageA: attended, stageB: max(reportDone, logged1),
-                            startNum: max(1, (cc.lastReceived ?? 0) - 40), asOf: yesterday, info: info)
+                            startNum: cc.firstLesson ?? max(1, (cc.lastReceived ?? 0) - 40), asOf: yesterday, info: info)
             case .recording:
                 co = Course(id: cc.id, title: cc.title, book: cc.book ?? "", mode: .recording, days: cc.days ?? [], time: cc.time,
                             released: cc.lastReceived ?? 0, stageA: max(reportDone, logged0), stageB: 0,
-                            startNum: max(1, (cc.lastReceived ?? 0) - 40), asOf: today, info: info)
+                            startNum: cc.firstLesson ?? max(1, (cc.lastReceived ?? 0) - 40), asOf: today, info: info)
             }
             co.nick = cc.nick
             co.link = cc.link
             co.endsOn = cc.endsOn
+            co.firstLesson = cc.firstLesson
             co.nextNote = cc.nextNote
             co.reportLastText = cc.reportLastText
             courses.append(co)

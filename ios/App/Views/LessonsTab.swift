@@ -424,7 +424,7 @@ private struct LessonList: View {
     private var top: Int {
         switch course.mode {
         case .teach: return max(course.stageA, course.stageB) + 1
-        default: return course.released
+        default: return max(course.released, course.firstLesson ?? 0)
         }
     }
 
@@ -440,7 +440,7 @@ private struct LessonList: View {
     var body: some View {
         // كل الدروس من الأحدث: اللي وصل كله، لين قبل اللي عليك بعشرة دروس (أو أول درس عندنا تفصيله)
         let known = course.info.keys.compactMap { Int($0) }
-        let low = max(1, min(known.min() ?? current, current - 10))
+        let low = max(course.firstLesson ?? 1, min(known.min() ?? current, current - 10))
         let nums = top >= low ? Array(stride(from: top, through: low, by: -1)) : []
         Card {
             ForEach(Array(nums.enumerated()), id: \.element) { i, n in
