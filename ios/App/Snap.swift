@@ -41,6 +41,7 @@ final class Snap: ObservableObject {
         add("food", 4, seg: 2, ys: [0, 500])
         add("sleep", 4, seg: 3, ys: [0, 500])
         add("wakesheet", 0, ys: [0])
+        add("valheim", 0, ys: [0])
         return s
     }()
 

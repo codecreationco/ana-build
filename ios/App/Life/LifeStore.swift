@@ -20,6 +20,8 @@ final class LifeStore: ObservableObject {
     @Published var recPending: RecPending? = nil
     /// يتغير مع كل أمر، عشان التحديث يبدأ على طول
     @Published var recKick = 0
+    /// سيرفر فالهايم (من وكيل الكمبيوتر)
+    @Published var vh: VhState? = nil
     private var pushTask: Task<Void, Never>?
     private var pulling = false
     /// إذا ملف السيرفر ما انقرا، ما نكتب فوقه لين ينصلح
@@ -40,6 +42,8 @@ final class LifeStore: ObservableObject {
             // للتصوير: كرت التسجيل وهو يسجل
             rec = RecSession(id: 1, course: "faraid", num: 75, cmd: "record", state: "recording",
                              stateAt: nil, recSec: 754, file: nil, error: nil, recorderSeen: "2099-01-01T00:00:00Z")
+            vh = VhState(state: "running", joinCode: "482913", players: 2, serverName: "mmm_new", world: "NewWorld",
+                         startedAt: nil, stateAt: nil, error: nil, cmd: nil, cmdAt: nil, pcOnline: true)
         } else if let data = try? Data(contentsOf: Self.url),
                   let saved = try? JSONDecoder().decode(LifeData.self, from: data) {
             d = saved

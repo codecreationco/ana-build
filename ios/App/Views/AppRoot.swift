@@ -40,6 +40,7 @@ struct AppRoot: View {
                 life.writeWidget()
                 Task { await life.pull(); life.writeWidget() }
                 Task { await life.recRefresh() }
+                Task { await life.vhRefresh() }
             }
             if p == .background { life.writeWidget() }
         }

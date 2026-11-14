@@ -5,6 +5,7 @@ import SwiftUI
 struct HomeTab: View {
     @EnvironmentObject var life: LifeStore
     @Environment(\.go) private var go
+    @State private var showValheim = false
 
     private var greeting: String {
         DateKit.cal.component(.hour, from: Date()) < 12 ? "صباح الخير" : "مساء الخير"
@@ -54,6 +55,18 @@ struct HomeTab: View {
                 LinkRow(icon: "heart", title: "الصحة", sub: healthLine) { go(4, nil) }
                 RowLine()
                 LinkRow(icon: "calendar", title: "الجدول", sub: scheduleLine) { go(1, 3) }
+                RowLine()
+                LinkRow(icon: "gamecontroller", title: "فالهايم", sub: life.vh?.line ?? "سيرفر اللعبة") { showValheim = true }
+            }
+            .fullScreenCover(isPresented: $showValheim) {
+                ValheimView()
+                    .environmentObject(life)
+                    .environment(\.layoutDirection, .rightToLeft)
+                    .preferredColorScheme(.dark)
+            }
+            .task { await life.vhRefresh() }
+            .onReceive(Snap.shared.$index) { i in
+                if Snap.on { showValheim = Snap.steps[min(i, Snap.steps.count - 1)].name.hasPrefix("valheim") }
             }
             Foot(text: "+ مساحة جديدة")
             Text(version).font(T.f(11)).foregroundStyle(T.dim)
