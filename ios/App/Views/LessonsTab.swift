@@ -344,7 +344,10 @@ struct CourseDetail: View {
         let items: [(String, String)]
         switch c.mode {
         case .recording: items = [("\(c.released)", "وصلني"), ("\(c.stageA)", "كتبت"), ("\(c.backlog)", "عليك")]
-        case .online: items = [("\(c.stageA)", "حضرت"), ("\(c.stageB)", "التقارير لين"), ("\(c.backlog)", "عليك")]
+        case .online:
+            // عدد الدروس بهالمادة نفسها (الظن يبدأ من 78، فالعد يبدأ من صفر)
+            let base = (c.firstLesson ?? 1) - 1
+            items = [("\(max(0, c.stageA - base))", "حضرت"), ("\(max(0, c.stageB - base))", "تقارير"), ("\(c.backlog)", "عليك")]
         case .teach: items = [("\(c.stageB)", "درّست"), ("\(c.stageA)", "محضّر لين"), ("\(c.nextTeach)", "الجاي")]
         }
         return HStack(spacing: 0) {
