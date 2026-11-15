@@ -88,6 +88,7 @@ struct CGymDay: Decodable {
         var cue: String?
         var lastTime: String?
         var machine: String?
+        var after: [String]?
         var sets: [S]?
     }
     var day: String
@@ -239,7 +240,7 @@ extension LifeStore {
                          sets: (e.sets ?? []).filter { !($0.warmup ?? false) }.map { (s: CGymDay.Ex.S) -> SetPlan in
                              SetPlan(weight: s.weight ?? 0, reps: s.reps ?? "", rir: s.rir ?? "")
                          },
-                         rest: e.restSec, lastTime: e.lastTime, machine: e.machine)
+                         rest: e.restSec, lastTime: e.lastTime, machine: e.machine, after: e.after)
             }
             guard !ex.isEmpty || !(g.walk ?? []).isEmpty else { return nil }
             return WorkoutDay(id: g.day, weekday: DateKit.weekday(g.day), kind: g.kind, title: g.title ?? g.kind,

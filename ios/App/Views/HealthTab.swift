@@ -453,6 +453,10 @@ private struct ExerciseBlock: View {
         let complete = ex.sets.indices.allSatisfy { life.isSetDone(day, ex, $0) }
         let prev = life.previous(ex, before: day)
         let rest = RestTimes.label(ex.restSec)
+        let blocked = life.blockers(day, w, ex)
+        let started = ex.sets.indices.contains { life.isSetDone(day, ex, $0) }
+        let last = life.lastFinished(day, w)
+        let sameMuscle = !started && blocked.isEmpty && last.map { $0.id != ex.id && $0.muscle == ex.muscle } == true
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: T.s2) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -464,6 +468,19 @@ private struct ExerciseBlock: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 OutlineChip(text: (complete ? "خلص · " : "") + "راحة " + rest)
+            }
+            if !blocked.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.fill").font(.system(size: 12))
+                    Text(verbatim: "يفتح بعد " + blocked.map { "\u{2066}" + $0.name + "\u{2069}" }.joined(separator: " و"))
+                        .font(T.f(14))
+                }
+                .foregroundStyle(T.muted)
+                .padding(.top, T.s2)
+            } else if sameMuscle {
+                Text("نفس العضلة، إذا تقدر سو تمرين ثاني بالنص.")
+                    .font(T.f(14)).foregroundStyle(T.accent)
+                    .padding(.top, T.s2)
             }
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
@@ -479,6 +496,9 @@ private struct ExerciseBlock: View {
                 }
             }
             .padding(.top, T.s3)
+            // مقفول: الجدول يبين بس ما ينضغط
+            .opacity(blocked.isEmpty || started ? 1 : 0.4)
+            .allowsHitTesting(blocked.isEmpty || started)
             RowLine().padding(.top, T.s3)
             NoteField(initial: life.gymLog(day).notes[ex.id] ?? "", placeholder: "ملاحظة على التمرين…",
                       boxed: false, size: 14, color: T.muted) { t in

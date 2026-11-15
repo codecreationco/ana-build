@@ -190,6 +190,7 @@ struct Exercise: Codable, Identifiable, Hashable {
     var rest: Int? = nil          // الراحة بالثواني (من محادثة النادي)
     var lastTime: String? = nil   // «آخر مرة: …»
     var machine: String? = nil    // إعدادات الجهاز الثابتة
+    var after: [String]? = nil    // تمارين (id) لازم تخلص قبله، وإلا يبقى مقفول
 
     var restSec: Int { rest ?? RestTimes.of(id) }
 }
@@ -211,6 +212,7 @@ struct SetLog: Codable, Hashable {
     var r: Int? = nil
     var rir: String? = nil
     var done = false
+    var at: String? = nil   // وقت ما خلصت الجولة (HH:mm:ss بتوقيت الكويت)
 }
 
 struct GymLog: Codable, Hashable {

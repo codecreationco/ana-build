@@ -612,11 +612,40 @@ final class LifeStore: ObservableObject {
     func toggleSet(_ day: String, _ ex: Exercise, _ i: Int) {
         let was = isSetDone(day, ex, i)
         updateSet(day, ex, i) { s in
-            if was { s.done = false }
+            if was { s.done = false; s.at = nil }
             else {
                 s.done = true
+                s.at = Self.clockNow()
                 if s.w == nil { s.w = ex.sets[i].weight }
             }
+        }
+    }
+
+    static func clockNow() -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = DateKit.tz
+        f.dateFormat = "HH:mm:ss"
+        return f.string(from: Date())
+    }
+
+    /// خلصت كل جولاته
+    func exDone(_ day: String, _ ex: Exercise) -> Bool {
+        !ex.sets.isEmpty && ex.sets.indices.allSatisfy { isSetDone(day, ex, $0) }
+    }
+
+    /// التمارين اللي لازم تخلص قبله (من نفس اليوم) وللحين ما خلصت
+    func blockers(_ day: String, _ w: WorkoutDay, _ ex: Exercise) -> [Exercise] {
+        let need = Set(ex.after ?? [])
+        return w.exercises.filter { need.contains($0.id) && !exDone(day, $0) }
+    }
+
+    /// آخر تمرين خلص كله (حسب وقت آخر جولة)
+    func lastFinished(_ day: String, _ w: WorkoutDay) -> Exercise? {
+        w.exercises.filter { exDone(day, $0) }.max { a, b in
+            let ta = a.sets.indices.compactMap { setLog(day, a, $0).at }.max() ?? ""
+            let tb = b.sets.indices.compactMap { setLog(day, b, $0).at }.max() ?? ""
+            return ta < tb
         }
     }
 
