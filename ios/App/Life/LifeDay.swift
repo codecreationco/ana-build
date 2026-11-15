@@ -99,6 +99,11 @@ extension LifeStore {
                 item.sub = "درس \(t.num) · أونلاين"
                 item.time = LFmt.minutesOf(c.time)
                 item.timeText = DateKit.timeLabel(c.time)
+            case (.online, 2):
+                item.title = "تحضير \(c.shortName)"
+                item.sub = "درس \(t.num)" + (t.done ? "" : " · اختياري")
+                if let m = LFmt.minutesOf(c.time) { item.time = m - 1 }
+                item.timeText = "قبل الدرس"
             case (.online, _):
                 item.title = "تقرير \(c.shortName)"
                 item.sub = "درس \(t.num)"

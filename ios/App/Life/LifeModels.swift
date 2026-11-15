@@ -82,6 +82,7 @@ struct LessonInfo: Codable, Hashable {
     var textFrom: String? = nil     // أول عبارة من المتن بالدرس
     var textTo: String? = nil       // آخر عبارة
     var page: String? = nil
+    var prep: String? = nil         // تحضير تمهيدي للدرس قبل لا ينعقد (نقاط مرتبة)
 
     /// شنو يغطي من المتن، بسطر وحدة
     var coverage: String? {
@@ -105,7 +106,7 @@ struct WorkDecision: Codable, Hashable {
 struct LessonLog: Codable, Hashable {
     let day: String
     let course: String
-    let stage: Int      // 0 = الخطوة الأولى، 1 = الثانية
+    let stage: Int      // 0 = الخطوة الأولى، 1 = الثانية، 2 = قريت التحضير (الأونلاين)
     let num: Int
 }
 

@@ -280,6 +280,17 @@ struct CourseDetail: View {
                 stats(c)
                     .padding(.top, T.s5)
                 if let n = c.nextNote { Foot(text: n, center: false) }
+                if c.mode == .online {
+                    // تحضير الدرس الجاي (إذا المحادثة حطته)
+                    let n = max(c.stageA + 1, life.lessonNumber(c, on: life.today) ?? 0)
+                    if let p = life.info(c, n).prep, !p.isEmpty {
+                        SecLabel(text: "تحضير الدرس الجاي")
+                        Card {
+                            LinkRow(icon: "lightbulb", title: "تحضير درس \(n)",
+                                    sub: life.info(c, n).topic ?? "نقاط تمهدك للدرس") { open = LessonRef(num: n) }
+                        }
+                    }
+                }
                 if let r = c.reportLastText { Foot(text: "آخر عبارة بالتقرير: " + r, center: false) }
                 if c.mode != .recording {
                     Card {
@@ -544,6 +555,10 @@ struct LessonSheet: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("سكّر")
                 }
+                if let prep = inf.prep, !prep.isEmpty {
+                    SecLabel(text: "التحضير")
+                    PrepText(text: prep).card()
+                }
                 if let cov = inf.coverage {
                     SecLabel(text: "من المتن")
                     Text(cov).font(T.f(17)).lineSpacing(5).foregroundStyle(T.ink).card()
@@ -580,5 +595,44 @@ struct LessonSheet: View {
             .padding(.top, T.s5)
             .padding(.bottom, 40)
         }
+    }
+}
+
+/// نص التحضير: «## » عنوان، «- » أو «• » نقطة، و«1. » ترقيم، والباقي فقرات
+struct PrepText: View {
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(text.components(separatedBy: "\n").enumerated()), id: \.offset) { _, raw in
+                let line = raw.trimmingCharacters(in: .whitespaces)
+                if line.isEmpty {
+                    Color.clear.frame(height: 2)
+                } else if line.hasPrefix("#") {
+                    Text(line.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces))
+                        .font(T.f(19, .bold)).foregroundStyle(T.ink)
+                        .padding(.top, 6)
+                } else if line.hasPrefix("- ") || line.hasPrefix("• ") || line.hasPrefix("* ") {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("•").font(T.f(17)).foregroundStyle(T.accent)
+                        Text(inline(String(line.dropFirst(2)))).font(T.f(17)).foregroundStyle(T.ink).lineSpacing(5)
+                    }
+                } else if let r = line.range(of: #"^\d+[.)]\s"#, options: .regularExpression) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(verbatim: String(line[r]).trimmingCharacters(in: .whitespaces))
+                            .font(T.f(15)).monospacedDigit().foregroundStyle(T.muted)
+                        Text(inline(String(line[r.upperBound...]))).font(T.f(17)).foregroundStyle(T.ink).lineSpacing(5)
+                    }
+                } else {
+                    Text(inline(line)).font(T.f(17)).foregroundStyle(T.ink).lineSpacing(6)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// **عريض** داخل السطر
+    private func inline(_ s: String) -> AttributedString {
+        (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
     }
 }

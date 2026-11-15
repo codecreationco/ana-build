@@ -204,10 +204,17 @@ private struct OtherDay: View {
 
 // MARK: - اليوم: الصبح، المسا، بأي وقت
 
+struct PrepRef: Identifiable {
+    let courseId: String
+    let num: Int
+    var id: String { "\(courseId)-\(num)" }
+}
+
 private struct TodayList: View {
     @EnvironmentObject var life: LifeStore
     @State private var asking: Book?
     @State private var pageText = ""
+    @State private var prepOpen: PrepRef?
 
     var body: some View {
         let items = life.todayItems
@@ -252,6 +259,12 @@ private struct TodayList: View {
             }
             .padding(.top, T.s3)
         }
+        .sheet(item: $prepOpen) { r in
+            LessonSheet(courseId: r.courseId, num: r.num)
+                .environmentObject(life)
+                .environment(\.layoutDirection, .rightToLeft)
+                .preferredColorScheme(.dark)
+        }
         .alert("وصلت صفحة كم؟", isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })) {
             TextField("الصفحة", text: $pageText).keyboardType(.numberPad)
             Button("حفظ") {
@@ -278,6 +291,12 @@ private struct TodayList: View {
     }
 
     private func tap(_ it: TodayItem) {
+        // التحضير: يفتح التحضير، ويتعلم إنك قريته
+        if case .lesson(let tid) = it.kind, let t = life.todayTasks.first(where: { $0.id == tid }), t.stage == 2 {
+            if !t.done { life.toggleTask(t) }
+            prepOpen = PrepRef(courseId: t.course.id, num: t.num)
+            return
+        }
         if case .book(let id) = it.kind, !it.done {
             if let b = life.d.books.first(where: { $0.id == id }) {
                 pageText = ""

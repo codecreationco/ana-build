@@ -306,6 +306,14 @@ final class LifeStore: ObservableObject {
                                               title: "احضر درس \(n)", meta: DateKit.timeLabel(c.time),
                                               done: false, num: n, action: "حضرت"))
                     }
+                    // التحضير (اختياري): إذا المحادثة حطت تحضير للدرس اللي اليوم
+                    let pn = did.last ?? max(c.stageA + 1, lessonNumber(c, on: today) ?? c.released)
+                    if info(c, pn).prep != nil {
+                        let read = logs(on: today, course: c.id, stage: 2).contains(pn)
+                        out.append(LessonTask(id: "\(c.id)-prep-\(pn)", course: c, stage: 2, label: "\(c.title) · تحضير",
+                                              title: read ? "قريت تحضير درس \(pn)" : "اقرا تحضير درس \(pn)",
+                                              meta: read ? nil : "اختياري · قبل الدرس", done: read, num: pn, action: "قريته"))
+                    }
                 }
                 let label = "\(c.title) · تقرير"
                 for n in logs(on: today, course: c.id, stage: 1) {
@@ -373,6 +381,13 @@ final class LifeStore: ObservableObject {
     /// الضغط على مهمة: إذا ما خلصت تنحسب، وإذا خلصت (وهي آخر وحدة) ترجع
     func toggleTask(_ t: LessonTask) {
         guard let c = course(t.course.id) else { return }
+        if t.stage == 2 {
+            // قراءة التحضير: علامة بس، ما تغير أرقام الحضور والتقرير
+            if t.done { d.lessonLogs.removeAll { $0.day == today && $0.course == c.id && $0.stage == 2 && $0.num == t.num } }
+            else { d.lessonLogs.append(LessonLog(day: today, course: c.id, stage: 2, num: t.num)) }
+            save()
+            return
+        }
         if t.done {
             let cur = t.stage == 0 ? c.stageA : c.stageB
             if cur == t.num { bump(c.id, stage: t.stage, by: -1) }
