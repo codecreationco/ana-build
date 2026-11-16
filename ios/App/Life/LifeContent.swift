@@ -52,6 +52,7 @@ struct CCourse: Decodable {
     var reportLeft: Int?
     var nextNote: String?
     var firstLesson: Int?
+    var lastOn: String?
 }
 
 struct CLesson: Decodable {
@@ -217,7 +218,8 @@ extension LifeStore {
                 let attended = max(cc.lastAttended ?? 0, logged0)
                 co = Course(id: cc.id, title: cc.title, book: cc.book ?? "", mode: .online, days: cc.days ?? [], time: cc.time,
                             released: max(cc.lastReceived ?? 0, attended), stageA: attended, stageB: max(reportDone, logged1),
-                            startNum: cc.firstLesson ?? max(1, (cc.lastReceived ?? 0) - 40), asOf: yesterday, info: info)
+                            startNum: cc.firstLesson ?? max(1, (cc.lastReceived ?? 0) - 40),
+                            asOf: cc.lastOn.map { min($0, today) } ?? yesterday, info: info)
             case .recording:
                 co = Course(id: cc.id, title: cc.title, book: cc.book ?? "", mode: .recording, days: cc.days ?? [], time: cc.time,
                             released: cc.lastReceived ?? 0, stageA: max(reportDone, logged0), stageB: 0,
