@@ -90,9 +90,12 @@ extension LifeStore {
     }
 
     /// يفتح رابط الدرس ويرسل «التسجيل» يدخل وياك
+    /// تسجيل الدروس تلقائياً مع «ادخل» (موقف مؤقتاً بطلب حسن)
+    static let autoRecord = false
+
     func enterLesson(_ c: Course) {
         if let s = c.link, let url = URL(string: s) { UIApplication.shared.open(url) }
-        recJoin(c)
+        if Self.autoRecord { recJoin(c) }
     }
 
     func recJoin(_ c: Course) {
