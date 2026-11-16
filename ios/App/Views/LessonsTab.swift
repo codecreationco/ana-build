@@ -521,6 +521,62 @@ struct LessonSheet: View {
     @Environment(\.dismiss) private var dismiss
     let courseId: String
     let num: Int
+    @State private var open: Set<String> = []
+
+    private func firstLine(_ t: String) -> String {
+        t.components(separatedBy: "\n").map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "#-•* ")) }
+            .first { !$0.isEmpty } ?? ""
+    }
+
+    private func toggle(_ k: String) {
+        withAnimation(.easeOut(duration: 0.2)) {
+            if open.contains(k) { open.remove(k) } else { open.insert(k) }
+        }
+    }
+
+    /// قسم يطوى: العنوان يلزق فوق وهو مفتوح، وتحت آخره زر «طوّه»
+    @ViewBuilder
+    private func fold<C: View>(_ k: String, _ title: String, preview: String, @ViewBuilder _ body: () -> C) -> some View {
+        let isOpen = open.contains(k)
+        Section {
+            if isOpen {
+                body()
+                Button { toggle(k) } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.up").font(.system(size: 12, weight: .semibold))
+                        Text("طوّه").font(T.f(14))
+                    }
+                    .foregroundStyle(T.muted)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.bottom, T.s2)
+            }
+        } header: {
+            Button { toggle(k) } label: {
+                HStack(alignment: .center, spacing: T.s3) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title).font(T.f(18, .semibold)).foregroundStyle(T.ink)
+                        if !isOpen {
+                            Text(verbatim: preview).font(T.f(14)).foregroundStyle(T.muted).lineLimit(1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(T.muted)
+                        .rotationEffect(.degrees(isOpen ? 180 : 0))
+                }
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(T.bg)
+            .overlay(alignment: .bottom) { if !isOpen { Rectangle().fill(T.line).frame(height: 1) } }
+            .accessibilityLabel(title + (isOpen ? "، مفتوح" : "، مطوي"))
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -542,7 +598,8 @@ struct LessonSheet: View {
         }
         let metaLine = parts.joined(separator: " · ")
         return ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            // الأقسام مطوية، وعنوان القسم المفتوح يلزق فوق، فتطويه من أي مكان
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: ([c.title, inf.section].compactMap { $0 } + ["درس \(num)"]).joined(separator: " · ")).font(T.f(14)).foregroundStyle(T.muted)
@@ -558,34 +615,38 @@ struct LessonSheet: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("سكّر")
                 }
+                .padding(.bottom, T.s3)
                 if let prep = inf.prep, !prep.isEmpty {
-                    SecLabel(text: "التحضير")
-                    PrepText(text: prep).card()
+                    fold("prep", "التحضير", preview: firstLine(prep)) { PrepText(text: prep).card() }
                 }
                 if let cov = inf.coverage {
-                    SecLabel(text: "من المتن")
-                    Text(cov).font(T.f(17)).lineSpacing(5).foregroundStyle(T.ink).card()
+                    fold("cov", "من المتن", preview: cov) {
+                        Text(cov).font(T.f(17)).lineSpacing(5).foregroundStyle(T.ink).card()
+                    }
                 }
                 if let det = inf.details {
-                    SecLabel(text: "شنو فيه")
-                    Text(det).font(T.f(18)).lineSpacing(7).foregroundStyle(T.ink).card()
+                    fold("det", "شنو فيه", preview: det) {
+                        Text(det).font(T.f(18)).lineSpacing(7).foregroundStyle(T.ink).card()
+                    }
                 }
-                SecLabel(text: "الملخص")
-                Text(inf.summary ?? "ما في ملخص للحين. ينضاف من المحادثة اللي نرتب فيها الدرس.")
-                    .font(T.f(18)).lineSpacing(6)
-                    .foregroundStyle(inf.summary == nil ? T.faint : T.ink)
-                    .card()
+                fold("sum", "الملخص", preview: inf.summary ?? "ما في ملخص للحين") {
+                    Text(inf.summary ?? "ما في ملخص للحين. ينضاف من المحادثة اللي نرتب فيها الدرس.")
+                        .font(T.f(18)).lineSpacing(6)
+                        .foregroundStyle(inf.summary == nil ? T.faint : T.ink)
+                        .card()
+                }
                 if !inf.points.isEmpty {
-                    SecLabel(text: "النقاط")
-                    Card {
-                        ForEach(inf.points.indices, id: \.self) { i in
-                            if i > 0 { RowLine() }
-                            HStack(alignment: .firstTextBaseline, spacing: T.s3) {
-                                Text(verbatim: "\(i + 1)").font(T.f(14)).monospacedDigit().foregroundStyle(T.muted).frame(width: 20)
-                                Text(inf.points[i]).font(T.f(17)).foregroundStyle(T.ink).lineSpacing(4)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                    fold("pts", "النقاط", preview: "\(inf.points.count) نقاط") {
+                        Card {
+                            ForEach(inf.points.indices, id: \.self) { i in
+                                if i > 0 { RowLine() }
+                                HStack(alignment: .firstTextBaseline, spacing: T.s3) {
+                                    Text(verbatim: "\(i + 1)").font(T.f(14)).monospacedDigit().foregroundStyle(T.muted).frame(width: 20)
+                                    Text(inf.points[i]).font(T.f(17)).foregroundStyle(T.ink).lineSpacing(4)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .padding(.horizontal, 18).padding(.vertical, 12)
                             }
-                            .padding(.horizontal, 18).padding(.vertical, 12)
                         }
                     }
                 }
