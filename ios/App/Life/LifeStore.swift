@@ -84,23 +84,31 @@ final class LifeStore: ObservableObject {
         }
     }
 
+    /// فيه رفع شغال الحين
+    private var pushing = false
+
+    /// يرفع نسخة التلفون. التلفون هو الوحيد اللي يكتب هالبيانات، فنسخته هي الصح دايماً:
+    /// إذا السيرفر صار أحدث (رفع ثاني سبقه)، يرفع فوقه بدل ما ياخذ نسخة السيرفر ويضيع اللي انكتب.
     private func push() async {
-        guard let data = try? JSONEncoder().encode(d) else { return }
-        do {
-            let (ok, v, server) = try await LifeSync.save(data, base: base)
-            if ok {
+        guard !pushing else { schedulePush(); return }
+        pushing = true
+        defer { pushing = false }
+        for _ in 0..<3 {
+            guard let data = try? JSONEncoder().encode(d) else { return }
+            let sentAt = d
+            do {
+                let (ok, v, _) = try await LifeSync.save(data, base: base)
                 base = v
-                dirty = false
-                sync = ""
-            } else if let server {
-                // انحدثت بالسيرفر (من المحادثة): ناخذ نسخة السيرفر
-                adopt(server, v)
-                dirty = false
-                undoData = nil
-                toast = UndoToast(text: "انحدثت البيانات من المحادثة")
+                if ok {
+                    // إذا انكتب شي وهو يرفع، يرفع مرة ثانية
+                    if d == sentAt { dirty = false; sync = "" } else { schedulePush() }
+                    return
+                }
+                // تعارض: ناخذ رقم السيرفر ونرفع نسختنا فوقه
+            } catch {
+                sync = "ما في اتصال · محفوظ على التلفون"
+                return
             }
-        } catch {
-            sync = "ما في اتصال · محفوظ على التلفون"
         }
     }
 
@@ -127,14 +135,14 @@ final class LifeStore: ObservableObject {
                 await push()
                 return
             }
-            if v != base, let doc {
-                // السيرفر انحدث (من المحادثة): ناخذ نسخته
+            if v > base, !dirty, !pushing, let doc {
+                // السيرفر أحدث وما عندنا شي ما انرفع: ناخذ نسخته
                 if !adopt(doc, v) { return }
-                dirty = false
             }
             await loadContent()
+            pulling = false
             if dirty {
-                pulling = false
+                // اللي انكتب بالتلفون (حتى وقت السحب) يرفع
                 await push()
                 return
             }
