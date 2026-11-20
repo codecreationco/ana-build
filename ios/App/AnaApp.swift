@@ -72,7 +72,6 @@ enum Refresher {
     static func run() async {
         schedule()
         guard let life = await LifeStore.current else { return }
-        await life.vhNotify()
         await life.pull()
         await MainActor.run {
             life.advance()
