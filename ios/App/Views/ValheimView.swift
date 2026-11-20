@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import UIKit
 
 /// سيرفر فالهايم على كمبيوتر حسن: وكيل على الكمبيوتر يكتب الحالة، والتطبيق يرسل تشغيل أو إطفاء.
@@ -52,6 +53,33 @@ extension LifeStore {
                 toast = UndoToast(text: "ما وصل الأمر للسيرفر")
             }
         }
+    }
+
+    /// دخول وطلعة اللاعبين: إشعار لكل حدث ما انرسل، وبعدين نعلّمه انرسل.
+    /// يشتغل والتطبيق مفتوح، وبالتحديث بالخلفية (آيفون يقرر متى)، فمو فوري إذا التطبيق مسكر.
+    func vhNotify() async {
+        guard !Snap.on else { return }
+        let key = DeviceKey.get()
+        guard let o = try? await LifeSync.rpc("vh_events", ["p_key": key, "p_after": 0, "p_only_pending": true]),
+              let list = o as? [[String: Any]], !list.isEmpty else { return }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var ids: [Int] = []
+        for e in list {
+            guard let id = (e["id"] as? NSNumber)?.intValue else { continue }
+            ids.append(id)
+            // القديم (أكثر من ٣٠ دقيقة) ننساه بدون إشعار
+            if let at = e["at"] as? String, let d = RecSession.date(at), Date().timeIntervalSince(d) > 30 * 60 { continue }
+            let kind = e["kind"] as? String ?? ""
+            let who = (e["player"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "لاعب"
+            let n = (e["players"] as? NSNumber)?.intValue ?? 0
+            let c = UNMutableNotificationContent()
+            c.title = "فالهايم"
+            c.body = kind == "join" ? "دخل \(who) السيرفر (\(n) داخل)" : "طلع \(who) (باقي \(n))"
+            c.sound = .default
+            try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "vh-\(id)", content: c, trigger: nil))
+        }
+        if !ids.isEmpty { _ = try? await LifeSync.rpc("vh_events_done", ["p_key": key, "p_ids": ids]) }
     }
 
     static func vhDecode(_ o: Any) -> VhState? {

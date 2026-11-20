@@ -65,13 +65,14 @@ enum Refresher {
 
     static func schedule() {
         let r = BGAppRefreshTaskRequest(identifier: id)
-        r.earliestBeginDate = Date(timeIntervalSinceNow: 3 * 3600)
+        r.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
         try? BGTaskScheduler.shared.submit(r)
     }
 
     static func run() async {
         schedule()
         guard let life = await LifeStore.current else { return }
+        await life.vhNotify()
         await life.pull()
         await MainActor.run {
             life.advance()

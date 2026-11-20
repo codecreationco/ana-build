@@ -28,7 +28,7 @@ struct AppRoot: View {
         .task(id: life.recKick) {
             // التسجيل: نسأل دايماً، كل ثانية وهو شغال وكل ١٠ ثواني غير جذي. أي زر يعيد العد من جديد
             while !Task.isCancelled {
-                if phase == .active { await life.recRefresh() }
+                if phase == .active { await life.recRefresh(); await life.vhNotify() }
                 let active = life.rec?.active == true || life.recPending != nil
                 try? await Task.sleep(nanoseconds: active ? 1_000_000_000 : 10_000_000_000)
             }

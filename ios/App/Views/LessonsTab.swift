@@ -413,7 +413,7 @@ private struct LessonRow: View {
                     if let c = info?.coverage {
                         Text(c).font(T.f(13)).foregroundStyle(T.muted).lineLimit(2).multilineTextAlignment(.leading)
                     } else if let d = info?.details ?? info?.summary {
-                        Text(d).font(T.f(13)).foregroundStyle(T.muted).lineLimit(2).multilineTextAlignment(.leading)
+                        Text(PrepText.plain(d)).font(T.f(13)).foregroundStyle(T.muted).lineLimit(2).multilineTextAlignment(.leading)
                     }
                     Text(status).font(T.f(13)).foregroundStyle(current ? T.accent : T.faint)
                 }
@@ -524,7 +524,8 @@ struct LessonSheet: View {
     @State private var open: Set<String> = []
 
     private func firstLine(_ t: String) -> String {
-        t.components(separatedBy: "\n").map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "#-•* ")) }
+        t.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "#-•* ")).replacingOccurrences(of: "**", with: "") }
             .first { !$0.isEmpty } ?? ""
     }
 
@@ -625,15 +626,17 @@ struct LessonSheet: View {
                     }
                 }
                 if let det = inf.details {
-                    fold("det", "شنو فيه", preview: det) {
-                        Text(det).font(T.f(18)).lineSpacing(7).foregroundStyle(T.ink).card()
+                    fold("det", "شنو فيه", preview: firstLine(det)) {
+                        PrepText(text: det).card()
                     }
                 }
-                fold("sum", "الملخص", preview: inf.summary ?? "ما في ملخص للحين") {
-                    Text(inf.summary ?? "ما في ملخص للحين. ينضاف من المحادثة اللي نرتب فيها الدرس.")
-                        .font(T.f(18)).lineSpacing(6)
-                        .foregroundStyle(inf.summary == nil ? T.faint : T.ink)
-                        .card()
+                fold("sum", "الملخص", preview: inf.summary.map(firstLine) ?? "ما في ملخص للحين") {
+                    if let sum = inf.summary {
+                        PrepText(text: sum).card()
+                    } else {
+                        Text("ما في ملخص للحين. ينضاف من المحادثة اللي نرتب فيها الدرس.")
+                            .font(T.f(18)).lineSpacing(6).foregroundStyle(T.faint).card()
+                    }
                 }
                 if !inf.points.isEmpty {
                     fold("pts", "النقاط", preview: "\(inf.points.count) نقاط") {
@@ -693,6 +696,14 @@ struct PrepText: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// نص بدون علامات التنسيق، للمعاينة بسطر أو سطرين
+    static func plain(_ t: String) -> String {
+        t.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "#-•* ")).replacingOccurrences(of: "**", with: "") }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
     }
 
     /// **عريض** داخل السطر
