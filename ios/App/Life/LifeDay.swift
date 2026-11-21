@@ -70,6 +70,15 @@ extension LifeStore {
         out.append(TodayItem(id: "leave", time: 400, timeText: "قبل الطلعة", title: "قبل لا أطلع",
                              sub: leaveSub, done: leaveDone, kind: .leave))
 
+        // الوزن كل صبح، والخصر إذا صار له أسبوع
+        let h = d.health[today]
+        out.append(TodayItem(id: "weight", time: 395, timeText: "الصبح", title: "الوزن",
+                             sub: h?.weight.map { LFmt.weight($0) + " كغ" } ?? "كل صبح", done: h?.weight != nil, kind: .weight))
+        if h?.waist != nil || waistDue {
+            out.append(TodayItem(id: "waist", time: 396, timeText: "الصبح", title: "محيط الخصر",
+                                 sub: h?.waist.map { LFmt.weight($0) + " سم" } ?? "مرة بالأسبوع", done: h?.waist != nil, kind: .waist))
+        }
+
         for c in choresOn(today) {
             let t = LFmt.minutesOf(c.time)
             out.append(TodayItem(id: "c-" + c.id, time: t, timeText: c.timeText ?? DateKit.timeLabel(c.time), title: c.title,
@@ -167,9 +176,24 @@ extension LifeStore {
             toggleLeave()
         case .gym:
             toggleChore("gym", today)
-        case .book:
-            break   // القراءة تحتاج رقم الصفحة، الشاشة تسأل
+        case .book, .weight, .waist:
+            break   // تحتاج رقم، الشاشة تسأل
         }
+    }
+
+    /// آخر قياس خصر قبل اليوم صار له ٧ أيام أو أكثر (أو ما في)
+    var waistDue: Bool {
+        guard let last = d.health.filter({ $0.key < today && $0.value.waist != nil }).keys.max() else { return true }
+        return DateKit.diff(last, today) >= 7
+    }
+
+    func setWeight(_ v: Double?) { var h = d.health[today] ?? DayHealth(); h.weight = v; d.health[today] = h; save() }
+    func setWaist(_ v: Double?) { var h = d.health[today] ?? DayHealth(); h.waist = v; d.health[today] = h; save() }
+
+    /// متوسط الوزن من الأحد للسبت
+    func weekWeight(_ start: String) -> Double? {
+        let vals = (0..<7).compactMap { d.health[DateKit.add($0, to: start)]?.weight }
+        return vals.isEmpty ? nil : vals.reduce(0, +) / Double(vals.count)
     }
 
     /// اقتراح من «بأي وقت»: اللي صار له أطول وقت ما انسوى

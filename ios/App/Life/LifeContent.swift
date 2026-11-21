@@ -98,6 +98,7 @@ struct CGymDay: Decodable {
     var title: String?
     var coach: String?
     var walk: [Walk]?
+    var walkAfter: [Walk]?
     var pool: Bool?
     var warmup: [String]?
     var exercises: [Ex]?
@@ -246,10 +247,11 @@ extension LifeStore {
                          },
                          rest: e.restSec, lastTime: e.lastTime, machine: e.machine, after: e.after)
             }
-            guard !ex.isEmpty || !(g.walk ?? []).isEmpty else { return nil }
+            guard !ex.isEmpty || !(g.walk ?? []).isEmpty || !(g.walkAfter ?? []).isEmpty else { return nil }
+            let after = (g.walkAfter ?? []).map { WalkSeg(min: $0.min ?? 0, speed: $0.speed ?? 0) }
             return WorkoutDay(id: g.day, weekday: DateKit.weekday(g.day), kind: g.kind, title: g.title ?? g.kind,
                               coach: g.coach, walk: (g.walk ?? []).map { WalkSeg(min: $0.min ?? 0, speed: $0.speed ?? 0) },
-                              exercises: ex, pool: g.pool ?? false)
+                              exercises: ex, pool: g.pool ?? false, walkAfter: after.isEmpty ? nil : after)
         }
 
         // وزان ماث

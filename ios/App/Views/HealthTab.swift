@@ -110,6 +110,7 @@ private struct GymView: View {
                     }
                 }
                 .padding(.top, T.s3)
+                if !(w.walkAfter ?? []).isEmpty { WalkCard(day: day, w: w, part: 1).padding(.top, T.s3) }
                 if w.pool { poolRow(day, g).padding(.top, T.s3) }
                 NoteField(initial: g.dayNote, placeholder: "اليوم بشكل عام: الطاقة، النوم، أي ألم…") { t in
                     life.updateGym(day) { $0.dayNote = t }
@@ -198,24 +199,42 @@ private struct WalkCard: View {
     @EnvironmentObject var life: LifeStore
     let day: String
     let w: WorkoutDay
+    /// 0 قبل الحديد، 1 بعده
+    var part = 0
+
+    private var plan: [WalkSeg] { part == 0 ? w.walk : (w.walkAfter ?? []) }
+    private var name: String {
+        if part == 1 { return "المشي بعد الحديد" }
+        return (w.walkAfter ?? []).isEmpty ? "المشي" : "المشي قبل الحديد"
+    }
+    private var nid: String { "walk-\(part)-" }
+
+    /// يعدل سجل هالقسم
+    private func upd(_ f: @escaping (inout WalkLog) -> Void) {
+        life.updateGym(day) { x in
+            var l = x.walkLog(part)
+            f(&l)
+            x.setWalkLog(part, l)
+        }
+    }
 
     /// المقاطع بعد تعديلات حسن (إذا غير الوقت أو السرعة)
-    private func segs(_ g: GymLog) -> [WalkSeg] {
-        w.walk.enumerated().map { i, s in
-            WalkSeg(min: g.walkMin?[String(i)] ?? s.min, speed: g.walkSpeed?[String(i)] ?? s.speed)
+    private func segs(_ g: WalkLog) -> [WalkSeg] {
+        plan.enumerated().map { i, s in
+            WalkSeg(min: g.min?[String(i)] ?? s.min, speed: g.speed?[String(i)] ?? s.speed)
         }
     }
     private func startOf(_ i: Int, _ segs: [WalkSeg]) -> Int { segs.prefix(i).reduce(0) { $0 + $1.min } * 60 }
     private func speed(_ v: Double) -> String { "\u{2066}" + LFmt.weight(v) + "\u{2069}" }
 
     var body: some View {
-        let g = life.gymLog(day)
+        let g = life.gymLog(day).walkLog(part)
         let sg = segs(g)
         let total = startOf(sg.count, sg)
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            let el = g.walkStart.map { max(0, Int(ctx.date.timeIntervalSince1970 - $0)) }
+            let el = g.start.map { max(0, Int(ctx.date.timeIntervalSince1970 - $0)) }
             let over = (el ?? 0) >= total
-            let running = el != nil && !over && !g.walk
+            let running = el != nil && !over && !g.done
             let cur = el.map { e in (0..<sg.count).last { startOf($0, sg) <= e } ?? 0 }
             Card {
                 VStack(alignment: .leading, spacing: 0) {
@@ -230,10 +249,10 @@ private struct WalkCard: View {
                             col("السرعة").frame(width: 64)
                             col("النبض").frame(width: 64)
                         }
-                        preRow(g, past: el != nil || g.walk)
+                        preRow(g, past: el != nil || g.done)
                         ForEach(sg.indices, id: \.self) { i in
-                            row(i, g, plan: w.walk[i], active: running && cur == i,
-                                past: g.walk || (el ?? -1) >= startOf(i + 1, sg))
+                            row(i, g, plan: plan[i], active: running && cur == i,
+                                past: g.done || (el ?? -1) >= startOf(i + 1, sg))
                         }
                     }
                     .padding(.top, T.s3)
@@ -246,17 +265,17 @@ private struct WalkCard: View {
             }
             .onAppear {
                 // قبل: النبض اللي انكتب بأول سطر قبل لا يبدأ كان «قبل لا تبدأ»
-                if g.walkStart == nil, g.walkHR?["pre"] == nil, let v = g.walkHR?["0"] {
-                    life.updateGym(day) { x in
-                        x.walkHR?["pre"] = v
-                        x.walkHR?["0"] = nil
+                if part == 0, g.start == nil, g.hr?["pre"] == nil, let v = g.hr?["0"] {
+                    upd { x in
+                        x.hr?["pre"] = v
+                        x.hr?["0"] = nil
                     }
                 }
             }
             .onChange(of: over) { _, o in
                 // خلص الوقت والتطبيق مفتوح: نسجل المشي
-                if o, !g.walk, let e = el, e < total + 5 {
-                    life.act("تم: المشي") { life.updateGym(day) { $0.walk = true } }
+                if o, !g.done, let e = el, e < total + 5 {
+                    life.act("تم: " + name) { upd { $0.done = true } }
                 }
             }
         }
@@ -266,21 +285,22 @@ private struct WalkCard: View {
         Text(t).font(T.f(12)).foregroundStyle(T.muted).lineLimit(1).minimumScaleFactor(0.8)
     }
 
-    private func head(_ g: GymLog, _ sg: [WalkSeg], _ total: Int, running: Bool, started: Bool) -> some View {
+    private func head(_ g: WalkLog, _ sg: [WalkSeg], _ total: Int, running: Bool, started: Bool) -> some View {
         HStack(alignment: .center, spacing: T.s2) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("المشي").font(T.f(18)).foregroundStyle(g.walk ? T.faint : T.ink)
+                Text(name).font(T.f(18)).foregroundStyle(g.done ? T.faint : T.ink)
                 Text(verbatim: "\(total / 60) د · \(sg.count) مقاطع").font(T.f(14)).foregroundStyle(T.muted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if running {
                 SmallButton(text: "وقّف") { stop() }
-            } else if !g.walk {
+            } else if !g.done {
                 SmallButton(text: started ? "من جديد" : "ابدأ") { start(sg) }
             }
-            Check(on: g.walk, label: "خلصت المشي", hit: 40) {
-                life.act(g.walk ? "رجعت: المشي" : "تم: المشي") { life.toggleWalk(day) }
-                if !g.walk { cancel() }
+            Check(on: g.done, label: "خلصت " + name, hit: 40) {
+                let was = g.done
+                life.act((was ? "رجعت: " : "تم: ") + name) { upd { $0.done.toggle() } }
+                if !was { cancel() }
             }
         }
     }
@@ -304,55 +324,55 @@ private struct WalkCard: View {
     }
 
     /// سطر قبل لا تبدأ: النبض بس
-    private func preRow(_ g: GymLog, past: Bool) -> some View {
+    private func preRow(_ g: WalkLog, past: Bool) -> some View {
         HStack(spacing: 6) {
             Text("قبل").font(T.f(14)).foregroundStyle(T.muted).frame(width: 44)
             Text("قبل لا تبدأ").font(T.f(14)).foregroundStyle(T.faint)
                 .frame(maxWidth: .infinity)
             Color.clear.frame(width: 64, height: 40)
-            CellField(initial: g.walkHR?["pre"].map(String.init) ?? "", decimal: false, dimmed: past,
+            CellField(initial: g.hr?["pre"].map(String.init) ?? "", decimal: false, dimmed: past,
                       label: "النبض قبل لا تبدأ") { t in
-                life.updateGym(day) { x in
-                    var d = x.walkHR ?? [:]
+                upd { x in
+                    var d = x.hr ?? [:]
                     d["pre"] = NumParse.int(t)
-                    x.walkHR = d.isEmpty ? nil : d
+                    x.hr = d.isEmpty ? nil : d
                 }
             }
             .frame(width: 64)
         }
     }
 
-    private func row(_ i: Int, _ g: GymLog, plan: WalkSeg, active: Bool, past: Bool) -> some View {
+    private func row(_ i: Int, _ g: WalkLog, plan: WalkSeg, active: Bool, past: Bool) -> some View {
         let k = String(i)
-        let m = g.walkMin?[k] ?? plan.min
-        let v = g.walkSpeed?[k] ?? plan.speed
+        let m = g.min?[k] ?? plan.min
+        let v = g.speed?[k] ?? plan.speed
         return HStack(spacing: 6) {
             Text(verbatim: "\(i + 1)")
                 .font(T.f(15, active ? .bold : .regular)).monospacedDigit()
                 .foregroundStyle(active ? T.accent : T.muted)
                 .frame(width: 44)
             CellField(initial: String(m), decimal: false, dimmed: past, label: "دقايق المقطع \(i + 1)") { t in
-                life.updateGym(day) { x in
-                    var d = x.walkMin ?? [:]
+                upd { x in
+                    var d = x.min ?? [:]
                     d[k] = NumParse.int(t)
-                    x.walkMin = d.isEmpty ? nil : d
+                    x.min = d.isEmpty ? nil : d
                 }
             }
             .frame(maxWidth: .infinity)
             CellField(initial: LFmt.weight(v), dimmed: past, label: "سرعة المقطع \(i + 1)") { t in
-                life.updateGym(day) { x in
-                    var d = x.walkSpeed ?? [:]
+                upd { x in
+                    var d = x.speed ?? [:]
                     d[k] = NumParse.double(t)
-                    x.walkSpeed = d.isEmpty ? nil : d
+                    x.speed = d.isEmpty ? nil : d
                 }
             }
             .frame(width: 64)
-            CellField(initial: g.walkHR?[k].map(String.init) ?? "", decimal: false, dimmed: past,
+            CellField(initial: g.hr?[k].map(String.init) ?? "", decimal: false, dimmed: past,
                       label: "النبض بآخر المقطع \(i + 1)") { t in
-                life.updateGym(day) { x in
-                    var d = x.walkHR ?? [:]
+                upd { x in
+                    var d = x.hr ?? [:]
                     d[k] = NumParse.int(t)
-                    x.walkHR = d.isEmpty ? nil : d
+                    x.hr = d.isEmpty ? nil : d
                 }
             }
             .frame(width: 64)
@@ -365,9 +385,9 @@ private struct WalkCard: View {
     // MARK: - الإشعارات
 
     private func start(_ sg: [WalkSeg]) {
-        life.updateGym(day) {
-            $0.walkStart = Date().timeIntervalSince1970
-            $0.walk = false
+        upd {
+            $0.start = Date().timeIntervalSince1970
+            $0.done = false
         }
         cancel()
         let center = UNUserNotificationCenter.current()
@@ -378,25 +398,25 @@ private struct WalkCard: View {
             c.sound = .default
             c.interruptionLevel = .timeSensitive
             let t = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(startOf(i, sg)), repeats: false)
-            center.add(UNNotificationRequest(identifier: "walk-\(i)", content: c, trigger: t))
+            center.add(UNNotificationRequest(identifier: nid + "\(i)", content: c, trigger: t))
         }
         let total = startOf(sg.count, sg)
         let c = UNMutableNotificationContent()
-        c.title = "خلص المشي"
+        c.title = "خلص " + name
         c.body = "\(total / 60) د · سجّل نبضك"
         c.sound = .default
         let t = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, total)), repeats: false)
-        center.add(UNNotificationRequest(identifier: "walk-end", content: c, trigger: t))
+        center.add(UNNotificationRequest(identifier: nid + "end", content: c, trigger: t))
     }
 
     private func stop() {
         cancel()
-        life.act("تم: المشي") { life.updateGym(day) { $0.walk = true } }
+        life.act("تم: " + name) { upd { $0.done = true } }
     }
 
     private func cancel() {
         UNUserNotificationCenter.current().removePendingNotificationRequests(
-            withIdentifiers: (1..<21).map { "walk-\($0)" } + ["walk-end"])
+            withIdentifiers: (1..<21).map { nid + "\($0)" } + [nid + "end"] + (1..<21).map { "walk-\($0)" } + ["walk-end"])
     }
 }
 
@@ -596,6 +616,25 @@ private struct GymProgress: View {
     @State private var open: Set<String> = []
 
     var body: some View {
+        let ws = DateKit.weekStart(life.today)
+        let thisW = life.weekWeight(ws)
+        let lastW = life.weekWeight(DateKit.add(-7, to: ws))
+        let todayW = life.d.health[life.today]?.weight
+        let waistDay = life.d.health.filter { $0.value.waist != nil }.keys.max()
+        SecLabel(text: "الوزن والخصر", trailing: "تسجلهم من «اليوم»")
+        Card {
+            ValueRow(title: "الوزن اليوم", sub: todayW == nil ? "ما انسجل للحين" : nil,
+                     value: todayW.map { LFmt.weight($0) + " كغ" } ?? "—", valueDim: todayW == nil)
+            RowLine()
+            ValueRow(title: "متوسط هالأسبوع",
+                     sub: lastW.map { "الأسبوع اللي قبله \u{2066}" + LFmt.weight($0) + "\u{2069} كغ" },
+                     value: thisW.map { LFmt.weight(($0 * 10).rounded() / 10) + " كغ" } ?? "—", valueDim: thisW == nil)
+            RowLine()
+            ValueRow(title: "محيط الخصر",
+                     sub: waistDay.map { $0 == life.today ? "اليوم" : "قبل \(DateKit.diff($0, life.today)) يوم" } ?? "ما انسجل للحين",
+                     value: waistDay.flatMap { life.d.health[$0]?.waist }.map { LFmt.weight($0) + " سم" } ?? "—",
+                     valueDim: waistDay == nil)
+        }
         SecLabel(text: "تطور الأوزان", trailing: "أعلى وزن بكل أسبوع")
         Card {
             let list = life.allExercises.filter { life.weeklyTop($0).count > 0 }

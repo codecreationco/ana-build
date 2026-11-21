@@ -215,6 +215,8 @@ private struct TodayList: View {
     @State private var asking: Book?
     @State private var pageText = ""
     @State private var prepOpen: PrepRef?
+    @State private var measuring: ItemKind?
+    @State private var measureText = ""
 
     var body: some View {
         let items = life.todayItems
@@ -265,6 +267,18 @@ private struct TodayList: View {
                 .environment(\.layoutDirection, .rightToLeft)
                 .preferredColorScheme(.dark)
         }
+        .alert(measuring == .waist ? "محيط الخصر كم؟" : "وزنك كم؟", isPresented: Binding(get: { measuring != nil }, set: { if !$0 { measuring = nil } })) {
+            TextField(measuring == .waist ? "سم" : "كغ", text: $measureText).keyboardType(.decimalPad)
+            Button("حفظ") {
+                let v = NumParse.double(measureText)
+                if measuring == .waist { life.act("تم: الخصر") { life.setWaist(v) } }
+                else { life.act("تم: الوزن") { life.setWeight(v) } }
+                measuring = nil
+            }
+            Button("إلغاء", role: .cancel) { measuring = nil }
+        } message: {
+            Text(measuring == .waist ? "بالسنتيمتر" : "بالكيلو")
+        }
         .alert("وصلت صفحة كم؟", isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })) {
             TextField("الصفحة", text: $pageText).keyboardType(.numberPad)
             Button("حفظ") {
@@ -291,6 +305,14 @@ private struct TodayList: View {
     }
 
     private func tap(_ it: TodayItem) {
+        // الوزن والخصر: يسأل عن الرقم
+        if it.kind == .weight || it.kind == .waist {
+            let h = life.d.health[life.today]
+            let v = it.kind == .weight ? h?.weight : h?.waist
+            measureText = v.map { LFmt.weight($0) } ?? ""
+            measuring = it.kind
+            return
+        }
         // التحضير: يفتح التحضير، ويتعلم إنك قريته
         if case .lesson(let tid) = it.kind, let t = life.todayTasks.first(where: { $0.id == tid }), t.stage == 2 {
             if !t.done { life.toggleTask(t) }

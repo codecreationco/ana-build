@@ -205,6 +205,7 @@ struct WorkoutDay: Codable, Identifiable, Hashable {
     var walk: [WalkSeg]
     var exercises: [Exercise]
     var pool: Bool
+    var walkAfter: [WalkSeg]? = nil   // مشي بعد الحديد
 }
 
 /// جولة وحدة: الوزن والعدات وباقي كم عدة
@@ -227,6 +228,26 @@ struct GymLog: Codable, Hashable {
     var walkHR: [String: Int]? = nil      // النبض عند بداية كل مقطع: "0" البداية، "1" أول تحويل…
     var walkMin: [String: Int]? = nil     // الدقايق الفعلية لكل مقطع إذا غيرها
     var walkSpeed: [String: Double]? = nil  // السرعة الفعلية لكل مقطع إذا غيرها
+    var walkAfter: WalkLog? = nil         // المشي اللي بعد الحديد (نفس الشكل)
+}
+
+/// سجل قسم مشي واحد. قسم قبل الحديد محفوظ بالحقول القديمة، وقسم بعده بـ walkAfter
+struct WalkLog: Codable, Hashable {
+    var done = false
+    var start: Double? = nil
+    var hr: [String: Int]? = nil
+    var min: [String: Int]? = nil
+    var speed: [String: Double]? = nil
+}
+
+extension GymLog {
+    func walkLog(_ part: Int) -> WalkLog {
+        part == 0 ? WalkLog(done: walk, start: walkStart, hr: walkHR, min: walkMin, speed: walkSpeed) : (walkAfter ?? WalkLog())
+    }
+    mutating func setWalkLog(_ part: Int, _ w: WalkLog) {
+        if part == 0 { walk = w.done; walkStart = w.start; walkHR = w.hr; walkMin = w.min; walkSpeed = w.speed }
+        else { walkAfter = w }
+    }
 }
 
 // MARK: - الصحة
@@ -237,6 +258,8 @@ struct DayHealth: Codable, Hashable {
     var creatine = false       // مع قهوة الصبح
     var electrolyte = false    // بالمطارة أيام النادي
     var bottle = false         // المطارة بالسيارة
+    var weight: Double? = nil  // الوزن الصبح (كغ)
+    var waist: Double? = nil   // محيط الخصر (سم)، مرة بالأسبوع
 }
 
 struct NightLog: Codable, Identifiable, Hashable {
@@ -463,6 +486,8 @@ enum ItemKind: Hashable {
     case leave                     // قبل لا أطلع: القهوة والمطارة
     case gym
     case book(String)
+    case weight
+    case waist
 }
 
 struct TodayItem: Identifiable {
