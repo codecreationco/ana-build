@@ -467,7 +467,7 @@ struct TxRow: View {
                         .font(T.f(17, .bold)).monospacedDigit()
                         .foregroundStyle(tx.neutral ? T.faint : (tx.isIn ? FinanceTab.goalColor : T.ink))
                     if tx.approx == true, let o = tx.amountOriginal {
-                        Text(verbatim: "\(Money.kd(o)) \(tx.currencyOriginal ?? "")").font(T.f(12)).monospacedDigit().foregroundStyle(T.faint)
+                        Text(verbatim: "≈ " + Money.orig(o, tx.currencyOriginal)).font(T.f(12)).monospacedDigit().foregroundStyle(T.faint)
                     }
                 }
                 .environment(\.layoutDirection, .leftToRight)
@@ -482,7 +482,7 @@ struct TxRow: View {
 
     private var amountText: String {
         guard let a = tx.amount else { return "—" }
-        let s = (tx.approx == true ? "≈" : "") + Money.kd(a)
+        let s = Money.kd(a)
         if tx.neutral { return s }
         return (tx.isIn ? "+" : "−") + s
     }
@@ -536,7 +536,7 @@ struct FinTxSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         if let d = tx.date { Text(verbatim: TxRow.when(d)) }
                         if tx.approx == true, let o = tx.amountOriginal {
-                            Text(verbatim: "تقريبي: \(Money.kd(o)) \(tx.currencyOriginal ?? ""). المبلغ الصح يطلع بالكشف")
+                            Text(verbatim: "تقريبي، من \(Money.orig(o, tx.currencyOriginal)). المبلغ الصح يطلع بالكشف")
                         }
                         if let b = tx.balance { Text(verbatim: "رصيدك بعدها \(Money.kd(b))") }
                     }

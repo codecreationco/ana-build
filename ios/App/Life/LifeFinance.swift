@@ -179,6 +179,11 @@ enum Money {
         return f.string(from: NSNumber(value: v)) ?? String(format: "%.3f", v)
     }
 
+    /// المبلغ بعملته: 10.99 USD
+    static func orig(_ v: Double, _ cur: String?) -> String {
+        String(format: "%.2f", v) + " " + (cur ?? "")
+    }
+
     static func pct(_ part: Double, _ whole: Double) -> Int {
         whole > 0 ? Int((part / whole * 100).rounded()) : 0
     }
