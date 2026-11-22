@@ -70,11 +70,15 @@ extension LifeStore {
         out.append(TodayItem(id: "leave", time: 400, timeText: "قبل الطلعة", title: "قبل لا أطلع",
                              sub: leaveSub, done: leaveDone, kind: .leave))
 
-        // الدواء كل سبت
-        if DateKit.weekday(today) == 7 {
-            let taken = d.health[today]?.med == true
-            out.append(TodayItem(id: "med", time: 540, timeText: "الصبح", title: "الدواء",
-                                 sub: taken ? "خذيته" : "يذكرك كل ٣ ساعات لين تاخذه", done: taken, kind: .med))
+        // الدواء كل سبت، وإذا ما انأخذ يكمل الأحد
+        if let md = medDay(today) {
+            let taken = d.health[md]?.med == true
+            // الأحد يطلع بس إذا السبت ما انأخذ، أو انأخذ اليوم
+            if md == today || !taken || d.health[today]?.med == true {
+                out.append(TodayItem(id: "med", time: 540, timeText: "الصبح",
+                                     title: md == today ? "الدواء" : "الدواء (حق أمس)",
+                                     sub: taken ? "خذيته" : "يذكرك كل ٣ ساعات لين تاخذه", done: taken, kind: .med))
+            }
         }
 
         // الوزن كل صبح، والخصر إذا صار له أسبوع
@@ -184,7 +188,7 @@ extension LifeStore {
         case .gym:
             toggleChore("gym", today)
         case .med:
-            setMed(!(d.health[today]?.med ?? false))
+            if let md = medDay(today) { setMed(!(d.health[md]?.med ?? false)) }
         case .book, .weight, .waist:
             break   // تحتاج رقم، الشاشة تسأل
         }
@@ -196,11 +200,27 @@ extension LifeStore {
         return DateKit.diff(last, today) >= 7
     }
 
-    /// الدواء انأخذ: يسكت التذكير
+    /// يوم الدواء اللي يخص هاليوم: السبت نفسه، والأحد يرجع للسبت اللي قبله
+    func medDay(_ day: String) -> String? {
+        switch DateKit.weekday(day) {
+        case 7: return day
+        case 1: return DateKit.add(-1, to: day)
+        default: return nil
+        }
+    }
+
+    /// الدواء انأخذ: يسكت التذكير (ينحفظ على يوم السبت حتى لو انأخذ الأحد)
     func setMed(_ v: Bool) {
-        var h = d.health[today] ?? DayHealth()
+        guard let md = medDay(today) else { return }
+        var h = d.health[md] ?? DayHealth()
         h.med = v ? true : nil
-        d.health[today] = h
+        d.health[md] = h
+        if md != today, v {
+            // يبين بقائمة اليوم إنه انأخذ اليوم
+            var t = d.health[today] ?? DayHealth(); t.med = true; d.health[today] = t
+        } else if md != today {
+            var t = d.health[today] ?? DayHealth(); t.med = nil; d.health[today] = t
+        }
         save()
         LifeNotifier.schedule(self)
     }

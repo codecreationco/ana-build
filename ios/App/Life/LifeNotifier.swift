@@ -70,11 +70,13 @@ enum LifeNotifier {
                     c0.link == nil ? body : "اضغط تدخل الدرس", link: c0.link)
             }
 
-            // الدواء كل سبت: الصبح، وبعدين كل ٣ ساعات لين آخر اليوم، إلا إذا انأخذ
-            if DateKit.weekday(day) == 7 && store.d.health[day]?.med != true {
+            // الدواء: السبت الصبح وبعدين كل ٣ ساعات، وإذا ما انأخذ يكمل الأحد بنفس الطريقة
+            if let md = store.medDay(day), store.d.health[md]?.med != true {
+                let sat = md == day
                 for t in ["09:00", "12:00", "15:00", "18:00", "21:00"] {
-                    add(day, t, "med-\(day)-\(t)", "الدواء", t == "09:00" ? "اليوم السبت، لا تنسى الدواء" : "خذيت الدواء؟",
-                        category: "med")
+                    let body = sat ? (t == "09:00" ? "اليوم السبت، لا تنسى الدواء" : "خذيت الدواء؟")
+                                   : "ما خذيت دواء أمس، خذيته؟"
+                    add(day, t, "med-\(day)-\(t)", "الدواء", body, category: "med")
                 }
             }
 
