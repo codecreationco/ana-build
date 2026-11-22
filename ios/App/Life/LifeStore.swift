@@ -22,6 +22,9 @@ final class LifeStore: ObservableObject {
     @Published var recKick = 0
     /// سيرفر فالهايم (من وكيل الكمبيوتر)
     @Published var vh: VhState? = nil
+    /// المصاريف (من قاعدة البيانات)
+    @Published var fin: FinState? = nil
+    @Published var finError = false
     private var pushTask: Task<Void, Never>?
     private var pulling = false
     /// إذا ملف السيرفر ما انقرا، ما نكتب فوقه لين ينصلح

@@ -21,6 +21,9 @@ enum DeviceKey {
         return k
     }
 
+    /// المفتاح إذا موجود، بدون ما يسوي واحد جديد (للأوامر اللي تشتغل بالخلفية)
+    static func existing() -> String? { read() }
+
     private static func read() -> String? {
         let q: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

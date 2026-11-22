@@ -41,6 +41,7 @@ struct AppRoot: View {
                 Task { await life.pull(); life.writeWidget() }
                 Task { await life.recRefresh() }
                 Task { await life.vhRefresh() }
+                Task { await life.finRefresh() }
             }
             if p == .background { life.writeWidget() }
         }
@@ -112,6 +113,7 @@ struct MainTabs: View {
         ("الدروس", "book"),
         ("الشغل", "briefcase"),
         ("الصحة", "heart"),
+        ("المصاريف", "creditcard"),
     ]
 
     var body: some View {
@@ -122,6 +124,7 @@ struct MainTabs: View {
                 page(2) { LessonsTab() }
                 page(3) { WorkTab() }
                 page(4) { HealthTab(seg: $healthSeg) }
+                page(5) { FinanceTab() }
                 UndoBar()
             }
             .animation(.easeOut(duration: 0.25), value: life.toast)
