@@ -70,6 +70,13 @@ extension LifeStore {
         out.append(TodayItem(id: "leave", time: 400, timeText: "قبل الطلعة", title: "قبل لا أطلع",
                              sub: leaveSub, done: leaveDone, kind: .leave))
 
+        // الدواء كل سبت
+        if DateKit.weekday(today) == 7 {
+            let taken = d.health[today]?.med == true
+            out.append(TodayItem(id: "med", time: 540, timeText: "الصبح", title: "الدواء",
+                                 sub: taken ? "خذيته" : "يذكرك كل ٣ ساعات لين تاخذه", done: taken, kind: .med))
+        }
+
         // الوزن كل صبح، والخصر إذا صار له أسبوع
         let h = d.health[today]
         out.append(TodayItem(id: "weight", time: 395, timeText: "الصبح", title: "الوزن",
@@ -176,6 +183,8 @@ extension LifeStore {
             toggleLeave()
         case .gym:
             toggleChore("gym", today)
+        case .med:
+            setMed(!(d.health[today]?.med ?? false))
         case .book, .weight, .waist:
             break   // تحتاج رقم، الشاشة تسأل
         }
@@ -185,6 +194,15 @@ extension LifeStore {
     var waistDue: Bool {
         guard let last = d.health.filter({ $0.key < today && $0.value.waist != nil }).keys.max() else { return true }
         return DateKit.diff(last, today) >= 7
+    }
+
+    /// الدواء انأخذ: يسكت التذكير
+    func setMed(_ v: Bool) {
+        var h = d.health[today] ?? DayHealth()
+        h.med = v ? true : nil
+        d.health[today] = h
+        save()
+        LifeNotifier.schedule(self)
     }
 
     func setWeight(_ v: Double?) { var h = d.health[today] ?? DayHealth(); h.weight = v; d.health[today] = h; save() }

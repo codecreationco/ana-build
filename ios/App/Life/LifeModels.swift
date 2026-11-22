@@ -260,6 +260,7 @@ struct DayHealth: Codable, Hashable {
     var bottle = false         // المطارة بالسيارة
     var weight: Double? = nil  // الوزن الصبح (كغ)
     var waist: Double? = nil   // محيط الخصر (سم)، مرة بالأسبوع
+    var med: Bool? = nil       // دواء السبت انأخذ
 }
 
 struct NightLog: Codable, Identifiable, Hashable {
@@ -488,6 +489,7 @@ enum ItemKind: Hashable {
     case book(String)
     case weight
     case waist
+    case med
 }
 
 struct TodayItem: Identifiable {

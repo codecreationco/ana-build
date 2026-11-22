@@ -4,6 +4,13 @@ import UserNotifications
 /// التنبيهات تنضبط على التلفون نفسه: القعدة، الصلاة (وقبل القضاء)، الدروس، وقبل لا تطلع.
 /// (عداد الراحة بالنادي ينضبط بروحه ونخليه.)
 enum LifeNotifier {
+    /// زر «إي خذيت» على إشعار الدواء
+    static func registerCategories() {
+        let taken = UNNotificationAction(identifier: "med-taken", title: "إي خذيت", options: [.foreground])
+        let med = UNNotificationCategory(identifier: "med", actions: [taken], intentIdentifiers: [])
+        UNUserNotificationCenter.current().setNotificationCategories([med])
+    }
+
     static func requestAuth() async {
         _ = try? await UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound, .badge])
@@ -15,13 +22,15 @@ enum LifeNotifier {
         let now = Date()
         var reqs: [(Date, String, UNMutableNotificationContent)] = []
 
-        func add(_ day: String, _ time: String, _ id: String, _ title: String, _ body: String, link: String? = nil) {
+        func add(_ day: String, _ time: String, _ id: String, _ title: String, _ body: String, link: String? = nil,
+                 category: String? = nil) {
             guard let at = DateKit.fire(day: day, time: time), at > now else { return }
             let c = UNMutableNotificationContent()
             c.title = title
             c.body = body
             c.sound = .default
             if let link { c.userInfo = ["link": link] }
+            if let category { c.categoryIdentifier = category }
             reqs.append((at, id, c))
         }
 
@@ -59,6 +68,14 @@ enum LifeNotifier {
                 add(day, LFmt.hhmm(m - 30), "l-\(c0.id)-30-\(day)", name + " بعد نص ساعة", body, link: c0.link)
                 add(day, LFmt.hhmm(m - 1), "l-\(c0.id)-1-\(day)", name + " بعد دقيقة",
                     c0.link == nil ? body : "اضغط تدخل الدرس", link: c0.link)
+            }
+
+            // الدواء كل سبت: الصبح، وبعدين كل ٣ ساعات لين آخر اليوم، إلا إذا انأخذ
+            if DateKit.weekday(day) == 7 && store.d.health[day]?.med != true {
+                for t in ["09:00", "12:00", "15:00", "18:00", "21:00"] {
+                    add(day, t, "med-\(day)-\(t)", "الدواء", t == "09:00" ? "اليوم السبت، لا تنسى الدواء" : "خذيت الدواء؟",
+                        category: "med")
+                }
             }
 
             // قبل لا تطلع

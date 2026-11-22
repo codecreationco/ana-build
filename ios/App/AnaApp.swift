@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        LifeNotifier.registerCategories()
         return true
     }
 
@@ -19,6 +20,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
+        if response.actionIdentifier == "med-taken" {
+            DispatchQueue.main.async { LifeStore.current?.setMed(true) }
+        }
         if let s = response.notification.request.content.userInfo["link"] as? String, let url = URL(string: s) {
             DispatchQueue.main.async {
                 // يفتح الدرس، ويرسل «التسجيل» يدخل وياك
