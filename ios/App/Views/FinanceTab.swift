@@ -24,6 +24,7 @@ struct FinanceTab: View {
             if let s = life.fin {
                 PageHead(title: "المصاريف", sub: monthLine(s))
                 hero(s)
+                extra(s)
                 status(s)
                 needs(s)
                 cats(s)
@@ -110,6 +111,39 @@ struct FinanceTab: View {
         .background(RoundedRectangle(cornerRadius: 22).fill(T.card))
         .padding(.top, T.s5)
         .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - خارج الميزانية
+
+    /// عداد ثاني: اللي انصرف برا الميزانية (يتصفر لما تسكره المالية)
+    @ViewBuilder
+    private func extra(_ s: FinState) -> some View {
+        if let x = s.extra {
+            let total = x.total ?? 0
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("خارج الميزانية").font(T.f(17)).foregroundStyle(T.ink)
+                    Spacer(minLength: T.s2)
+                    Text(verbatim: Money.kd(total)).font(T.f(24, .bold)).monospacedDigit()
+                        .foregroundStyle(total > 0 ? T.ink : T.faint)
+                    Text("د.ك").font(T.f(14)).foregroundStyle(T.muted)
+                }
+                let since = RecSession.date(x.since).map { d -> String in
+                    let c = DateKit.cal.dateComponents([.day, .month], from: d)
+                    return "من \(c.day ?? 1) \(DateKit.months[max(0, (c.month ?? 1) - 1)])"
+                }
+                let n = x.count ?? 0
+                let cats = (x.byCat ?? []).map { "\($0.name) \(Money.kd($0.used))" }.joined(separator: " · ")
+                Text(verbatim: [n == 0 ? "ماكو شي" : (n == 1 ? "حركة وحدة" : "\(n) حركات"), since, cats.isEmpty ? nil : cats]
+                        .compactMap { $0 }.joined(separator: " · "))
+                    .font(T.f(13)).foregroundStyle(T.muted)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(RoundedRectangle(cornerRadius: 22).fill(T.card))
+            .padding(.top, T.s3)
+            .accessibilityElement(children: .combine)
+        }
     }
 
     // MARK: - حالة الشهر

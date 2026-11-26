@@ -129,6 +129,14 @@ struct FinIn: Decodable, Equatable {
     var date: Date? { RecSession.date(at) }
 }
 
+/// مصروفات خارج الميزانية (من extra_since لين تتسكر)
+struct FinExtra: Decodable, Equatable {
+    var since: String?
+    var total: Double?
+    var count: Int?
+    var byCat: [FinCat]?
+}
+
 struct FinState: Decodable, Equatable {
     var monthStart: String?
     var monthEnd: String?
@@ -136,6 +144,7 @@ struct FinState: Decodable, Equatable {
     var spendBase: Double?
     var allowance: FinIn?
     var housing: FinIn?
+    var extra: FinExtra?
     var budget: [FinCat]?
     var tx: [FinTx]?
     var commitments: [FinCommit]?
@@ -373,6 +382,7 @@ enum FinSample {
             spendBase: 493.534,
             allowance: FinIn(at: ago(280), amount: 868.834),
             housing: nil,
+            extra: FinExtra(since: ago(30), total: 36.5, count: 5, byCat: [FinCat(category: "كتب", spent: 36.5)]),
             budget: [
                 FinCat(category: "الأكل", limit: 0, color: "#E39B3F", pace: true, note: nil, spent: 61.35),
                 FinCat(category: "البنزين", limit: 0, color: "#5FA8D3", pace: false, note: nil, spent: 15),
