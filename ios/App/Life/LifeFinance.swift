@@ -122,10 +122,20 @@ struct FinNote: Decodable, Equatable, Identifiable {
     var pinned: Bool?
 }
 
+/// دخل نزل (العلاوة أو بدل السكن)
+struct FinIn: Decodable, Equatable {
+    var at: String?
+    var amount: Double?
+    var date: Date? { RecSession.date(at) }
+}
+
 struct FinState: Decodable, Equatable {
     var monthStart: String?
     var monthEnd: String?
     var income: Double?
+    var spendBase: Double?
+    var allowance: FinIn?
+    var housing: FinIn?
     var budget: [FinCat]?
     var tx: [FinTx]?
     var commitments: [FinCommit]?
@@ -360,12 +370,15 @@ enum FinSample {
             monthStart: iso.string(from: start),
             monthEnd: iso.string(from: DateKit.cal.date(byAdding: .month, value: 1, to: start) ?? now),
             income: 1018.834,
+            spendBase: 493.534,
+            allowance: FinIn(at: ago(280), amount: 868.834),
+            housing: nil,
             budget: [
-                FinCat(category: "الأكل", limit: 120, color: "#E39B3F", pace: true, note: nil, spent: 61.35),
-                FinCat(category: "البنزين", limit: 40, color: "#5FA8D3", pace: false, note: nil, spent: 15),
-                FinCat(category: "الاشتراكات", limit: 35, color: "#9C8CF0", pace: false, note: nil, spent: 21.4),
-                FinCat(category: "البيت", limit: 60, color: "#62B58F", pace: false, note: nil, spent: 12.5),
-                FinCat(category: "شخصي", limit: 50, color: "#D7727E", pace: false, note: nil, spent: 8),
+                FinCat(category: "الأكل", limit: 0, color: "#E39B3F", pace: true, note: nil, spent: 61.35),
+                FinCat(category: "البنزين", limit: 0, color: "#5FA8D3", pace: false, note: nil, spent: 15),
+                FinCat(category: "الاشتراكات", limit: 0, color: "#9C8CF0", pace: false, note: nil, spent: 21.4),
+                FinCat(category: "البيت", limit: 0, color: "#62B58F", pace: false, note: nil, spent: 12.5),
+                FinCat(category: "شخصي", limit: 0, color: "#D7727E", pace: false, note: nil, spent: 8),
                 FinCat(category: nil, limit: 0, color: nil, pace: false, note: nil, spent: 7),
             ],
             tx: [
@@ -380,10 +393,8 @@ enum FinSample {
                 FinTx(id: 1, at: ago(280), account: "main", dir: "in", kind: "income", amount: 868.834, label: "العلاوة", inBudget: true),
             ],
             commitments: [
-                FinCommit(id: 1, name: "القرض", amount: 357.33, dayFrom: 1, dayTo: 3, freq: "monthly", paid: false),
-                FinCommit(id: 2, name: "التأمينات", amount: 170, dayFrom: 25, dayTo: 26, freq: "monthly", paid: true),
-                FinCommit(id: 3, name: "Zain", amount: 14, dayFrom: 5, dayTo: 5, freq: "monthly", paid: nil),
-                FinCommit(id: 4, name: "دروب بوكس", amount: 36, freq: "yearly", dueMonth: 3, paid: nil),
+                FinCommit(id: 1, name: "القرض + تأمينه", amount: 357.33, dayFrom: 1, dayTo: 3, freq: "monthly", paid: false),
+                FinCommit(id: 2, name: "التأمينات", amount: 170, dayFrom: 25, dayTo: 28, freq: "monthly", paid: true, paidAt: ago(20), paidAmount: 169.344),
             ],
             goals: [
                 FinGoal(id: 1, name: "احتياط الطوارئ", target: 500, value: 120),

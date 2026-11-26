@@ -24,11 +24,10 @@ struct FinanceTab: View {
             if let s = life.fin {
                 PageHead(title: "المصاريف", sub: monthLine(s))
                 hero(s)
+                status(s)
                 needs(s)
                 cats(s)
                 txList(s)
-                commitments(s)
-                goals(s)
                 wishlist(s)
                 notes(s)
                 if pending > 0 {
@@ -68,38 +67,42 @@ struct FinanceTab: View {
         return "من \(c.day ?? 1) \(DateKit.months[max(0, (c.month ?? 1) - 1)]) · يوم \(n) من \(total)"
     }
 
+    /// عداد واحد: كم صرفت من المصروف، وخط صغير وين وصل الشهر
     private func hero(_ s: FinState) -> some View {
-        let spent = s.spent, limit = s.limit
+        let spent = s.spent
+        let base = s.spendBase ?? 0
         let (n, total) = s.days()
-        let expected = limit * Double(n) / Double(total)
+        let monthPart = Double(n) / Double(total)
+        let spentPart = base > 0 ? spent / base : 0
+        let fast = spentPart > monthPart + 0.005
         return VStack(alignment: .leading, spacing: 0) {
             Text("صرفت").font(T.f(15)).foregroundStyle(T.muted)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(verbatim: Money.kd(spent)).font(T.f(44, .bold)).monospacedDigit().foregroundStyle(T.ink)
                 Text("د.ك").font(T.f(17)).foregroundStyle(T.muted)
                 Spacer(minLength: 0)
-                if limit > 0 {
-                    Text(verbatim: "\(Money.pct(spent, limit))٪")
+                if base > 0 {
+                    Text(verbatim: "\(Money.pct(spent, base))٪")
                         .font(T.f(24, .bold)).monospacedDigit()
-                        .foregroundStyle(spent > limit ? RecorderCard.red : T.ink)
+                        .foregroundStyle(spent > base ? RecorderCard.red : T.ink)
                 }
             }
-            if limit > 0 {
-                Text(verbatim: "من \(Money.kd(limit, decimals: false)) · باقي \(Money.kd(max(0, limit - spent)))")
+            if base > 0 {
+                Text(verbatim: "من \(Money.kd(base)) · باقي \(Money.kd(max(0, base - spent)))")
                     .font(T.f(15)).foregroundStyle(T.muted)
-                StackBar(cats: s.budget ?? [], limit: max(limit, spent))
+                PaceBar(value: spentPart, mark: monthPart, color: fast ? FinanceTab.buildColor : FinanceTab.goalColor, height: 10)
                     .padding(.top, T.s3)
-                paceLine(spent: spent, expected: expected, what: "المصروف كله")
-                    .padding(.top, T.s3)
+                HStack(spacing: 6) {
+                    Image(systemName: fast ? "hare" : "tortoise").font(.system(size: 13)).foregroundStyle(fast ? FinanceTab.buildColor : T.muted)
+                    Text(verbatim: "صرفت \(Money.pct(spent, base))٪ وطاف \(Int((monthPart * 100).rounded()))٪ من الشهر"
+                         + (fast ? " · أسرع من الشهر" : " · ماشي زين"))
+                        .font(T.f(14)).foregroundStyle(fast ? T.ink : T.muted)
+                }
+                .padding(.top, T.s3)
             } else {
-                Text("الميزانية والبنود تنضاف من محادثة المالية.")
+                Text("المصروف الشهري ينضاف من محادثة المالية.")
                     .font(T.f(15)).foregroundStyle(T.muted)
                     .padding(.top, T.s1)
-            }
-            if let inc = s.income, inc > 0 {
-                Text(verbatim: "الدخل هالشهر \(Money.kd(inc))")
-                    .font(T.f(14)).foregroundStyle(T.faint)
-                    .padding(.top, T.s2)
             }
         }
         .padding(.horizontal, 18)
@@ -109,73 +112,71 @@ struct FinanceTab: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// «المفروض لين اليوم 46 · إنت زايد 15»
-    private func paceLine(spent: Double, expected: Double, what: String) -> some View {
-        let diff = spent - expected
-        let ahead = diff > 0.5
-        let txt: String
-        if abs(diff) <= 0.5 { txt = "على المفروض بالضبط" }
-        else if ahead { txt = "أسرع من المفروض بـ \(Money.kd(diff, decimals: false))" }
-        else { txt = "أبطأ من المفروض بـ \(Money.kd(-diff, decimals: false))" }
-        return HStack(spacing: 6) {
-            Image(systemName: ahead ? "hare" : "tortoise").font(.system(size: 13)).foregroundStyle(ahead ? RecorderCard.red : T.muted)
-            Text(verbatim: "المفروض لين اليوم \(Money.kd(expected, decimals: false)) · \(txt)")
-                .font(T.f(14)).foregroundStyle(ahead ? T.ink : T.muted)
+    // MARK: - حالة الشهر
+
+    /// العلاوة وبدل السكن نزلوا؟ والالتزامات انخصمت؟
+    private func status(_ s: FinState) -> some View {
+        var rows: [(String, Bool, String)] = []
+        func line(_ x: FinIn?, wait: String) -> String {
+            guard let x else { return wait }
+            return [x.amount.map { Money.kd($0) }, x.date.map(TxRow.when)].compactMap { $0 }.joined(separator: " · ")
         }
-        .accessibilityLabel("\(what): المفروض لين اليوم \(Money.kd(expected, decimals: false))، \(txt)")
+        rows.append(("العلاوة", s.allowance != nil, line(s.allowance, wait: "للحين ما نزلت")))
+        rows.append(("بدل السكن", s.housing != nil, line(s.housing, wait: "للحين ما نزل · ينزل يوم 1 أو 2")))
+        for c in s.commitments ?? [] {
+            let paid = c.paid == true
+            let sub = paid
+                ? [c.paidAmount.map { Money.kd($0) }, RecSession.date(c.paidAt).map(TxRow.when)].compactMap { $0 }.joined(separator: " · ")
+                : "للحين ما انخصم · " + c.when
+            rows.append((c.name, paid, sub))
+        }
+        return Group {
+            SecLabel(text: "حالة الشهر")
+            Card {
+                ForEach(Array(rows.enumerated()), id: \.offset) { i, r in
+                    if i > 0 { RowLine() }
+                    HStack(spacing: T.s3) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(r.0).font(T.f(17)).foregroundStyle(T.ink)
+                            Text(verbatim: r.2).font(T.f(13)).monospacedDigit().foregroundStyle(T.muted)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        CheckMark(on: r.1)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 56)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityValue(r.1 ? "تم" : "للحين")
+                }
+            }
+        }
     }
 
     // MARK: - البنود
 
+    /// كل بند كم صرفت عليه، بس
     @ViewBuilder
     private func cats(_ s: FinState) -> some View {
-        let list = s.budget ?? []
+        let list = (s.budget ?? []).filter { $0.category != nil || $0.used != 0 }
         if !list.isEmpty {
-            SecLabel(text: "البنود")
+            SecLabel(text: "وين راحت")
             Card {
                 ForEach(Array(list.enumerated()), id: \.offset) { i, c in
                     if i > 0 { RowLine() }
-                    catRow(c, color: Self.color(c, i), s)
-                }
-            }
-        }
-    }
-
-    private func catRow(_ c: FinCat, color: Color, _ s: FinState) -> some View {
-        let (n, total) = s.days()
-        let over = c.lim > 0 && c.used > c.lim
-        let expected = c.lim * Double(n) / Double(total)
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: T.s2) {
-                Circle().fill(color).frame(width: 10, height: 10)
-                Text(c.name).font(T.f(17)).foregroundStyle(c.category == nil ? T.muted : T.ink)
-                Spacer(minLength: T.s2)
-                Text(verbatim: Money.kd(c.used)).font(T.f(17, .bold)).monospacedDigit().foregroundStyle(over ? RecorderCard.red : T.ink)
-                if c.lim > 0 {
-                    Text(verbatim: "من \(Money.kd(c.lim, decimals: false))").font(T.f(14)).monospacedDigit().foregroundStyle(T.muted)
-                }
-            }
-            if c.lim > 0 {
-                PaceBar(value: c.used / c.lim, mark: c.pace == true ? expected / c.lim : nil, color: color)
-                Group {
-                    if over {
-                        Text(verbatim: "زايد \(Money.kd(c.used - c.lim))").foregroundStyle(RecorderCard.red)
-                    } else if c.pace == true {
-                        let d = c.used - expected
-                        Text(verbatim: "باقي \(Money.kd(c.lim - c.used)) · " + (d > 0.5 ? "أسرع من المفروض بـ \(Money.kd(d, decimals: false))" : "ماشي زين"))
-                            .foregroundStyle(d > 0.5 ? T.ink : T.muted)
-                    } else {
-                        Text(verbatim: "باقي \(Money.kd(c.lim - c.used))").foregroundStyle(T.muted)
+                    HStack(spacing: T.s2) {
+                        Circle().fill(Self.color(c, i)).frame(width: 10, height: 10)
+                        Text(c.name).font(T.f(17)).foregroundStyle(c.category == nil ? T.muted : T.ink)
+                        Spacer(minLength: T.s2)
+                        Text(verbatim: Money.kd(c.used)).font(T.f(17, c.used > 0 ? .bold : .regular)).monospacedDigit()
+                            .foregroundStyle(c.used > 0 ? T.ink : T.faint)
                     }
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 52)
+                    .accessibilityElement(children: .combine)
                 }
-                .font(T.f(13))
-            } else if c.category == nil {
-                Text("حركات ما لها بند للحين").font(T.f(13)).foregroundStyle(T.faint)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .accessibilityElement(children: .combine)
     }
 
     // MARK: - تحتاج تفاصيل
@@ -224,73 +225,6 @@ struct FinanceTab: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    // MARK: - الالتزامات
-
-    @ViewBuilder
-    private func commitments(_ s: FinState) -> some View {
-        let list = s.commitments ?? []
-        if !list.isEmpty {
-            let paid = list.filter { $0.paid == true }.count
-            SecLabel(text: "الالتزامات", trailing: "انخصم \(paid) من \(list.count)")
-            Card {
-                ForEach(Array(list.enumerated()), id: \.element.id) { i, c in
-                    if i > 0 { RowLine() }
-                    HStack(spacing: T.s3) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(c.name).font(T.f(17)).foregroundStyle(c.paid == true ? T.faint : T.ink)
-                            Text(verbatim: c.when + (c.note.map { " · " + $0 } ?? "")).font(T.f(13)).foregroundStyle(T.muted)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if let a = c.paidAmount ?? c.amount {
-                            Text(verbatim: Money.kd(a)).font(T.f(16)).monospacedDigit().foregroundStyle(c.paid == true ? T.muted : T.ink)
-                        }
-                        if c.paid != nil {
-                            CheckMark(on: c.paid == true)
-                                .accessibilityLabel(c.paid == true ? "انخصم" : "للحين ما انخصم")
-                        } else {
-                            Color.clear.frame(width: 26, height: 26)
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .frame(minHeight: 52)
-                    .accessibilityElement(children: .combine)
-                }
-            }
-        }
-    }
-
-    // MARK: - الأهداف
-
-    @ViewBuilder
-    private func goals(_ s: FinState) -> some View {
-        let list = s.goals ?? []
-        if !list.isEmpty {
-            SecLabel(text: "الأهداف")
-            Card {
-                ForEach(Array(list.enumerated()), id: \.element.id) { i, g in
-                    if i > 0 { RowLine() }
-                    let v = g.value ?? 0, t = g.target ?? 0
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(g.name).font(T.f(17)).foregroundStyle(T.ink)
-                            Spacer()
-                            Text(verbatim: Money.kd(v, decimals: false)).font(T.f(17, .bold)).monospacedDigit().foregroundStyle(T.ink)
-                            Text(verbatim: "من \(Money.kd(t, decimals: false))").font(T.f(14)).monospacedDigit().foregroundStyle(T.muted)
-                        }
-                        Bar(value: t > 0 ? v / t : 0, color: Self.goalColor, height: 6)
-                        if let n = g.note, !n.isEmpty {
-                            Text(n).font(T.f(13)).foregroundStyle(T.muted)
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .accessibilityElement(children: .combine)
                 }
             }
         }
@@ -384,36 +318,12 @@ struct FinanceTab: View {
 
 // MARK: - الأشرطة
 
-/// شريط واحد مقسم بألوان البنود
-private struct StackBar: View {
-    let cats: [FinCat]
-    let limit: Double
-
-    var body: some View {
-        GeometryReader { g in
-            HStack(spacing: 2) {
-                ForEach(Array(cats.enumerated()), id: \.offset) { i, c in
-                    if c.used > 0 {
-                        Rectangle().fill(FinanceTab.color(c, i))
-                            .frame(width: max(2, g.size.width * CGFloat(c.used / max(limit, 0.001)) - 2))
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-            .frame(width: g.size.width, alignment: .leading)
-            .background(T.card2)
-            .clipShape(Capsule())
-        }
-        .frame(height: 12)
-        .accessibilityHidden(true)
-    }
-}
-
-/// شريط البند، وعليه خط صغير وين المفروض تكون لين اليوم
+/// شريط، وعليه خط صغير (مثلاً وين وصل الشهر)
 private struct PaceBar: View {
     let value: Double
     let mark: Double?
     let color: Color
+    var height: CGFloat = 6
 
     var body: some View {
         GeometryReader { g in
@@ -421,14 +331,14 @@ private struct PaceBar: View {
                 Capsule().fill(T.card2)
                 Capsule().fill(color).frame(width: g.size.width * CGFloat(min(max(value, 0), 1)))
                 if let mark {
-                    Rectangle().fill(T.ink)
-                        .frame(width: 2, height: 12)
-                        .offset(x: g.size.width * CGFloat(min(max(mark, 0), 1)) - 1)
+                    RoundedRectangle(cornerRadius: 1).fill(T.ink)
+                        .frame(width: 3, height: height + 8)
+                        .offset(x: g.size.width * CGFloat(min(max(mark, 0), 1)) - 1.5)
                 }
             }
         }
-        .frame(height: 6)
-        .padding(.vertical, 3)
+        .frame(height: height)
+        .padding(.vertical, 4)
         .accessibilityHidden(true)
     }
 }

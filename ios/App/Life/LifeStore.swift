@@ -25,6 +25,9 @@ final class LifeStore: ObservableObject {
     /// المصاريف (من قاعدة البيانات)
     @Published var fin: FinState? = nil
     @Published var finError = false
+    /// خطة النادي لكل يوم (من gym_days)، وبدايات أسابيع البرنامج
+    @Published var gymPlans: [String: WorkoutDay] = [:]
+    @Published var gymWeekStarts: [String] = []
     private var pushTask: Task<Void, Never>?
     private var pulling = false
     /// إذا ملف السيرفر ما انقرا، ما نكتب فوقه لين ينصلح
@@ -847,20 +850,58 @@ final class LifeStore: ObservableObject {
 
     // MARK: - أرشيف النادي
 
+    /// بداية أسبوع البرنامج (من gym_weeks)، وإلا الأحد
+    func gymWeekStart(_ k: String) -> String {
+        if let s = gymWeekStarts.last(where: { $0 <= k }), DateKit.diff(s, k) < 7 { return s }
+        return DateKit.add(-(DateKit.weekday(k) - 1), to: k)
+    }
+
+    /// يوم قديم بالأرشيف: تمارينه من خطة نفس التاريخ، ومعاها أي جولة انسجلت وماهي بالخطة
+    func archiveDay(_ k: String) -> WorkoutDay? {
+        let base = gymPlans[k] ?? (DateKit.weekStart(k) == DateKit.weekStart(today) ? workout(on: k) : nil)
+        var exs = base?.exercises ?? []
+        var top: [String: Int] = [:]
+        for (key, s) in d.gymLogs[k]?.sets ?? [:] where s.done {
+            let parts = key.split(separator: "#")
+            guard parts.count == 2, let i = Int(parts[1]) else { continue }
+            top[String(parts[0]), default: -1] = max(top[String(parts[0])] ?? -1, i)
+        }
+        if !top.isEmpty {
+            var known: [String: Exercise] = [:]
+            for w in Array(gymPlans.values) + d.workouts { for e in w.exercises where known[e.id] == nil { known[e.id] = e } }
+            let blank = SetPlan(weight: 0, reps: "", rir: "")
+            for (id, mi) in top.sorted(by: { $0.key < $1.key }) {
+                if let j = exs.firstIndex(where: { $0.id == id }) {
+                    while exs[j].sets.count <= mi { exs[j].sets.append(exs[j].sets.last ?? blank) }
+                } else {
+                    var e = known[id] ?? Exercise(id: id, name: id, ar: "", muscle: "", cue: nil, sets: [])
+                    e.sets = (0...mi).map { $0 < e.sets.count ? e.sets[$0] : (e.sets.last ?? blank) }
+                    exs.append(e)
+                }
+            }
+        }
+        guard !exs.isEmpty else { return nil }
+        var w = base ?? WorkoutDay(id: k, weekday: DateKit.weekday(k), kind: "تمرين", title: "تمرين", coach: nil,
+                                   walk: [], exercises: [], pool: false)
+        w.exercises = exs
+        return w
+    }
+
     /// كل أسبوع فيه نادي: الحصص والجولات (من الأحدث)
     var gymWeeks: [GymWeek] {
         var map: [String: [String]] = [:]
-        for k in d.gymLogs.keys where workout(on: k) != nil { map[DateKit.weekStart(k), default: []].append(k) }
+        let keys = Set(d.gymLogs.keys).union(gymPlans.keys.filter { $0 < today })
+        for k in keys where k <= today && archiveDay(k) != nil { map[gymWeekStart(k), default: []].append(k) }
         return map.keys.sorted(by: >).map { (w: String) -> GymWeek in
             let days = (map[w] ?? []).sorted()
-            var done = 0, total = 0
+            var done = 0, total = 0, sessions = 0
             for k in days {
-                guard let wo = workout(on: k) else { continue }
+                guard let wo = archiveDay(k) else { continue }
                 let s = setsDone(k, wo)
                 done += s.done
                 total += s.total
+                if s.done > 0 { sessions += 1 }
             }
-            let sessions = days.filter { k in workout(on: k).map { setsDone(k, $0).done > 0 } ?? false }.count
             return GymWeek(start: w, days: days, sessions: sessions, setsDone: done, setsTotal: total)
         }
     }

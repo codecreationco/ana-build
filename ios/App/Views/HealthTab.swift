@@ -672,7 +672,7 @@ private struct GymProgress: View {
 
     private func weekLabel(_ start: String) -> String {
         let end = DateKit.add(6, to: start)
-        if start == DateKit.weekStart(life.today) { return "هالأسبوع" }
+        if start == life.gymWeekStart(life.today) { return "هالأسبوع" }
         return "\(DateKit.dayNum(start)) \(DateKit.monthName(start)) – \(DateKit.dayNum(end)) \(DateKit.monthName(end))"
     }
 
@@ -699,7 +699,7 @@ private struct GymProgress: View {
             .buttonStyle(.plain)
             if isOpen {
                 ForEach(wk.days, id: \.self) { day in
-                    if let w = life.workout(on: day) {
+                    if let w = life.archiveDay(day) {
                         RowLine()
                         dayLog(day, w)
                     }
@@ -711,7 +711,7 @@ private struct GymProgress: View {
     private func dayLog(_ day: String, _ w: WorkoutDay) -> some View {
         let g = life.gymLog(day)
         return VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: "\(DateKit.dayName(day)) \(DateKit.dayNum(day)) · \(w.kind)").font(T.f(14)).foregroundStyle(T.muted)
+            Text(verbatim: "\(DateKit.dayName(day)) \(DateKit.dayNum(day)) · \(w.title)").font(T.f(14)).foregroundStyle(T.muted)
             ForEach(w.exercises) { ex in
                 let parts = ex.sets.indices.compactMap { i -> String? in
                     guard let s = g.sets["\(ex.id)#\(i)"], s.done || (s.r ?? 0) > 0 else { return nil }

@@ -14,8 +14,9 @@ struct ContentDoc: Decodable {
     var books: [CBook] = []
     var routine: [CRoutine] = []
     var changes: [CChange] = []
+    var gymWeeks: [CGymWeek] = []
 
-    enum CodingKeys: String, CodingKey { case courses, lessons, gymDays, workSteps, workDecisions, weekly, appointments, books, routine, changes }
+    enum CodingKeys: String, CodingKey { case courses, lessons, gymDays, workSteps, workDecisions, weekly, appointments, books, routine, changes, gymWeeks }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -29,7 +30,13 @@ struct ContentDoc: Decodable {
         books = (try? c.decode([CBook].self, forKey: .books)) ?? []
         routine = (try? c.decode([CRoutine].self, forKey: .routine)) ?? []
         changes = (try? c.decode([CChange].self, forKey: .changes)) ?? []
+        gymWeeks = (try? c.decode([CGymWeek].self, forKey: .gymWeeks)) ?? []
     }
+}
+
+struct CGymWeek: Decodable {
+    var weekNo: Int?
+    var startsOn: String
 }
 
 struct CCourse: Decodable {
@@ -176,6 +183,24 @@ extension LifeSync {
 }
 
 extension LifeStore {
+
+    /// سطر من gym_days ← يوم تمرين
+    static func workoutDay(_ g: CGymDay) -> WorkoutDay? {
+        let ex: [Exercise] = (g.exercises ?? []).map { (e: CGymDay.Ex) -> Exercise in
+            Exercise(id: e.exKey, name: e.name, ar: e.nameAr ?? e.muscle ?? "", muscle: e.grp ?? e.muscle ?? "",
+                     cue: e.cue, unit: e.unit ?? "kg",
+                     sets: (e.sets ?? []).filter { !($0.warmup ?? false) }.map { (s: CGymDay.Ex.S) -> SetPlan in
+                         SetPlan(weight: s.weight ?? 0, reps: s.reps ?? "", rir: s.rir ?? "")
+                     },
+                     rest: e.restSec, lastTime: e.lastTime, machine: e.machine, after: e.after)
+        }
+        guard !ex.isEmpty || !(g.walk ?? []).isEmpty || !(g.walkAfter ?? []).isEmpty else { return nil }
+        let after = (g.walkAfter ?? []).map { WalkSeg(min: $0.min ?? 0, speed: $0.speed ?? 0) }
+        return WorkoutDay(id: g.day, weekday: DateKit.weekday(g.day), kind: g.kind, title: g.title ?? g.kind,
+                          coach: g.coach, walk: (g.walk ?? []).map { WalkSeg(min: $0.min ?? 0, speed: $0.speed ?? 0) },
+                          exercises: ex, pool: g.pool ?? false, walkAfter: after.isEmpty ? nil : after)
+    }
+
     /// يحط محتوى المحادثات مكان القديم، ويخلي تسجيلات حسن وملاحظاته
     func applyContent(_ c: ContentDoc) {
         let today = self.today
@@ -238,21 +263,10 @@ extension LifeStore {
 
         // النادي: أيام هالأسبوع (كل يوم بأسبوعه)
         let week = DateKit.weekStart(today)
-        d.workouts = c.gymDays.filter { $0.day >= week && $0.day <= DateKit.add(6, to: week) }.compactMap { (g: CGymDay) -> WorkoutDay? in
-            let ex: [Exercise] = (g.exercises ?? []).map { (e: CGymDay.Ex) -> Exercise in
-                Exercise(id: e.exKey, name: e.name, ar: e.nameAr ?? e.muscle ?? "", muscle: e.grp ?? e.muscle ?? "",
-                         cue: e.cue, unit: e.unit ?? "kg",
-                         sets: (e.sets ?? []).filter { !($0.warmup ?? false) }.map { (s: CGymDay.Ex.S) -> SetPlan in
-                             SetPlan(weight: s.weight ?? 0, reps: s.reps ?? "", rir: s.rir ?? "")
-                         },
-                         rest: e.restSec, lastTime: e.lastTime, machine: e.machine, after: e.after)
-            }
-            guard !ex.isEmpty || !(g.walk ?? []).isEmpty || !(g.walkAfter ?? []).isEmpty else { return nil }
-            let after = (g.walkAfter ?? []).map { WalkSeg(min: $0.min ?? 0, speed: $0.speed ?? 0) }
-            return WorkoutDay(id: g.day, weekday: DateKit.weekday(g.day), kind: g.kind, title: g.title ?? g.kind,
-                              coach: g.coach, walk: (g.walk ?? []).map { WalkSeg(min: $0.min ?? 0, speed: $0.speed ?? 0) },
-                              exercises: ex, pool: g.pool ?? false, walkAfter: after.isEmpty ? nil : after)
-        }
+        d.workouts = c.gymDays.filter { $0.day >= week && $0.day <= DateKit.add(6, to: week) }.compactMap(Self.workoutDay)
+        // كل الأيام (للأرشيف): كل يوم بخطته هو
+        gymPlans = Dictionary(c.gymDays.compactMap { g in Self.workoutDay(g).map { (g.day, $0) } }, uniquingKeysWith: { a, _ in a })
+        gymWeekStarts = c.gymWeeks.map(\.startsOn).sorted()
 
         // وزان ماث
         d.workSteps = c.workSteps.map { (s: CStep) -> WorkStep in
